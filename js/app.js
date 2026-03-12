@@ -470,9 +470,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                         ${count >= minSentencesRequired ? 'Hazır' : 'Eksik'}
                     </span>
                 </td>
-                <td>
+                <td style="display: flex; gap: 4px; justify-content: center; align-items: center;">
                     <button class="btn btn-ghost btn-sm btn-word-detail" data-word="${w.word}">
                         Detay
+                    </button>
+                    <button class="btn btn-ghost btn-sm btn-word-generate-5" data-word="${w.word}" title="+5 Cümle Üret" style="color: var(--accent-purple-light); padding: 8px;">
+                        <i class="fa-solid fa-plus"></i> <span style="font-weight:bold;">5</span>
                     </button>
                 </td>
             `;
@@ -483,6 +486,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Bind detail buttons
         document.querySelectorAll('.btn-word-detail').forEach(btn => {
             btn.addEventListener('click', (e) => openWordDetails(e.currentTarget.dataset.word));
+        });
+
+        // Bind generator buttons
+        document.querySelectorAll('.btn-word-generate-5').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const w = e.currentTarget.dataset.word;
+                generate5SentencesForWord(w, false);
+            });
         });
     }
 
@@ -624,6 +635,49 @@ document.addEventListener('DOMContentLoaded', async () => {
             showToast('Kelime silindi.', 'success');
         }
     });
+
+    els.btnGenerate5Sentences.addEventListener('click', () => {
+        if (!currentDetailWord) return;
+        generate5SentencesForWord(currentDetailWord, true);
+    });
+
+    async function generate5SentencesForWord(word, isFromModal = false) {
+        const apiKey = await DB.getSetting('gemini_api_key');
+        if (!apiKey) {
+            showToast('Lütfen önce Ayarlar\'dan API anahtarı girin.', 'error');
+            return;
+        }
+
+        if (isFromModal) {
+            els.modalWordDetails.classList.remove('visible');
+        }
+        
+        cancelGeneration = false;
+        els.overlayGen.classList.add('visible');
+        els.genTotalNum.textContent = 1;
+        els.genCurrentNum.textContent = 0;
+        els.genProgressFill.style.width = '0%';
+        els.genCurrentWord.textContent = word;
+        els.btnCancelGen.textContent = 'İptal Et';
+
+        try {
+            const added = await GeminiService.addMoreSentences(word, 5);
+            els.genCurrentNum.textContent = 1;
+            els.genProgressFill.style.width = '100%';
+            showToast(`${word} için ${added} yeni cümle eklendi!`, 'success');
+        } catch (e) {
+            showToast(`Hata: ${e.message}`, 'error');
+        } finally {
+            els.overlayGen.classList.remove('visible');
+            await updateDashboard();
+            renderWordList();
+            
+            // Eğer isFromModal ise modalı güncelleyip geri açabiliriz
+            if (isFromModal && !cancelGeneration) {
+                await openWordDetails(word);
+            }
+        }
+    }
 
     // ─── Practice Session Logic ─────────────────────────────
     

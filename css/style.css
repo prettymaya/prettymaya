@@ -50,7 +50,7 @@
     --transition-slow: 400ms ease;
 
     --sidebar-width: 260px;
-    --mobile-nav-height: 65px;
+    --mobile-nav-height: 85px;
 }
 
 /* ─── Reset & Base ────────────────────────────── */
@@ -256,17 +256,19 @@ h3 { font-size: 1.15rem; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 5px;
+    padding: 8px;
     color: var(--text-muted);
     text-decoration: none;
-    font-size: 0.9rem;
+    font-size: 1.05rem;
+    font-weight: 500;
     cursor: pointer;
     transition: color 0.2s ease;
     border-radius: var(--radius-sm);
 }
 
 .mobile-nav-link .icon {
-    font-size: 1.3rem;
+    font-size: 1.6rem;
+    margin-bottom: 4px;
 }
 
 .mobile-nav-link.active {
