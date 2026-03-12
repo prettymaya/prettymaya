@@ -53,6 +53,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnResetDB: document.getElementById('btn-danger-reset'),
         btnExportDb: document.getElementById('btn-export-db'),
         inputImportDb: document.getElementById('input-import-db'),
+        
+        // Sync
+        inputGithubToken: document.getElementById('setting-github-token'),
+        inputGistId: document.getElementById('setting-github-gist-id'),
+        btnSyncTest: document.getElementById('btn-sync-test'),
+        btnSyncPush: document.getElementById('btn-sync-push'),
+        btnSyncPull: document.getElementById('btn-sync-pull'),
+        syncStatus: document.getElementById('sync-status'),
 
         // Practice
         practiceSetup: document.getElementById('practice-setup'),
@@ -207,14 +215,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             minSentencesRequired = parseInt(count);
             els.selectMinSentences.value = minSentencesRequired;
         }
+
+        const ghToken = await DB.getSetting('github_token');
+        if (ghToken) els.inputGithubToken.value = ghToken;
+
+        const gistId = await DB.getSetting('github_gist_id');
+        if (gistId) els.inputGistId.value = gistId;
     }
 
     els.btnSaveSettings.addEventListener('click', async () => {
         const key = els.inputApiKey.value.trim();
         const minCount = els.selectMinSentences.value;
+        const ghToken = els.inputGithubToken.value.trim();
+        const gistId = els.inputGistId.value.trim();
         
         await DB.saveSetting('gemini_api_key', key);
         await DB.saveSetting('min_sentences', minCount);
+        await DB.saveSetting('github_token', ghToken);
+        await DB.saveSetting('github_gist_id', gistId);
+
         minSentencesRequired = parseInt(minCount);
         
         els.btnSaveSettings.innerHTML = '<i class="fa-solid fa-check"></i> Kaydedildi';
@@ -239,6 +258,88 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         els.btnTestApi.disabled = false;
         els.btnTestApi.textContent = 'Test Et';
+    });
+
+    // ─── Cloud Sync ─────────────────────────────────────────
+    els.btnSyncTest.addEventListener('click', async () => {
+        const tk = els.inputGithubToken.value.trim();
+        els.btnSyncTest.disabled = true;
+        els.syncStatus.textContent = "Test ediliyor...";
+        try {
+            await SyncService.testConnection(tk);
+            els.syncStatus.innerHTML = '<span style="color:var(--success);"><i class="fa-solid fa-check"></i> Github Tokensu geçerli!</span>';
+            await DB.saveSetting('github_token', tk);
+        } catch(e) {
+            els.syncStatus.innerHTML = `<span style="color:var(--error);"><i class="fa-solid fa-xmark"></i> Hata: ${e.message}</span>`;
+        }
+        els.btnSyncTest.disabled = false;
+    });
+
+    els.btnSyncPush.addEventListener('click', async () => {
+        const tk = els.inputGithubToken.value.trim();
+        let gistId = els.inputGistId.value.trim();
+        if(!tk) {
+            showToast('Lütfen önce GitHub Token girin.', 'error');
+            return;
+        }
+
+        els.btnSyncPush.disabled = true;
+        els.btnSyncPush.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;margin-right:6px"></span> Yükleniyor...';
+        
+        try {
+            const data = await DB.exportAll();
+            const dataStr = JSON.stringify(data, null, 2);
+
+            if (gistId) {
+                // Update existing
+                await SyncService.updateGist(tk, gistId, dataStr);
+                showToast('Veriler buluta kaydedildi!', 'success');
+            } else {
+                // Create new
+                const newId = await SyncService.createGist(tk, dataStr);
+                els.inputGistId.value = newId;
+                await DB.saveSetting('github_gist_id', newId);
+                await DB.saveSetting('github_token', tk);
+                showToast('Yeni Bulut Yedeği oluşturuldu!', 'success');
+            }
+        } catch(e) {
+            showToast('Push hatası: ' + e.message, 'error');
+            els.syncStatus.innerHTML = `<span style="color:var(--error);">${e.message}</span>`;
+        } finally {
+            els.btnSyncPush.disabled = false;
+            els.btnSyncPush.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Buluta Kaydet (Push)';
+        }
+    });
+
+    els.btnSyncPull.addEventListener('click', async () => {
+        const tk = els.inputGithubToken.value.trim();
+        const gistId = els.inputGistId.value.trim();
+        
+        if(!tk || !gistId) {
+            showToast('Pull yapmak için Token ve Gist ID gereklidir.', 'error');
+            return;
+        }
+        
+        if(!confirm('Buluttaki veriler cihazınızdaki tüm verilerin üzerine yazılacak. Onaylıyor musunuz?')) return;
+
+        els.btnSyncPull.disabled = true;
+        els.btnSyncPull.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;margin-right:6px"></span> İndiriliyor...';
+        
+        try {
+            const data = await SyncService.getGist(tk, gistId);
+            await DB.importAll(data);
+            await DB.saveSetting('github_token', tk);
+            await DB.saveSetting('github_gist_id', gistId);
+            await updateDashboard();
+            renderWordList();
+            showToast('Buluttaki veriler cihaza başarıyla indirildi!', 'success');
+        } catch(e) {
+            showToast('Pull hatası: ' + e.message, 'error');
+            console.error(e);
+        } finally {
+            els.btnSyncPull.disabled = false;
+            els.btnSyncPull.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Buluttan Aç (Pull)';
+        }
     });
 
     els.btnResetDB.addEventListener('click', async () => {

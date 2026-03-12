@@ -359,6 +359,36 @@
                 </div>
 
                 <div class="card settings-section">
+                    <h3><i class="fa-brands fa-github" style="color: #f0f6fc;"></i> Bulut Senkronizasyonu (Gist)</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+                        Kelimelerinizi cihazlar arası taşımak için limitsiz & ücretsiz yöntem. GitHub'dan "gist" yetkisine sahip bir <a href="https://github.com/settings/tokens/new?scopes=gist&description=VocabRecallSync" target="_blank" style="color: var(--accent-purple-light); text-decoration: underline;">Token alın</a>.
+                    </p>
+                    
+                    <div class="input-group">
+                        <label for="setting-github-token">GitHub Token (Şifre)</label>
+                        <input type="password" id="setting-github-token" placeholder="ghp_xxx..." autocomplete="off">
+                    </div>
+                    
+                    <div class="input-group" style="margin-top: 16px;">
+                        <label for="setting-github-gist-id">Gist ID (Bırakırsanız yeni oluşturulur)</label>
+                        <input type="text" id="setting-github-gist-id" placeholder="Boş bırakıp kaydet derseniz otomatik dolar" autocomplete="off" style="font-family: monospace;">
+                        <div id="sync-status" style="margin-top: 8px; font-size: 0.8rem;"></div>
+                    </div>
+
+                    <div class="action-bar" style="margin-top: 20px;">
+                        <button class="btn btn-secondary" id="btn-sync-test">
+                            <i class="fa-solid fa-link"></i> Test Et
+                        </button>
+                        <button class="btn btn-primary" id="btn-sync-push" title="Buradaki verileri buluta yükler">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> Buluta Kaydet (Push)
+                        </button>
+                        <button class="btn btn-success" id="btn-sync-pull" title="Buluttaki verileri bu cihaza indirir">
+                            <i class="fa-solid fa-cloud-arrow-down"></i> Buluttan Aç (Pull)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card settings-section">
                     <h3><i class="fa-solid fa-database" style="color: var(--info);"></i> Veri Yönetimi</h3>
                     
                     <div class="action-bar" style="margin-top: 16px;">
@@ -511,6 +541,7 @@
 
     <!-- Scripts -->
     <script src="js/db.js"></script>
+    <script src="js/sync.js"></script>
     <script src="js/gemini.js"></script>
     <script src="js/session.js"></script>
     <script src="js/app.js"></script>
