@@ -32,16 +32,16 @@ const GeminiService = {
         return `You are an expert English teacher creating vocabulary active recall exercises. Generate exactly ${count} fill-in-the-blank sentences for the English word "${word}".
 
 STRICT RULES:
-1. Use the word's most common and natural meanings.
+1. REQUIRED DIVERSITY: You MUST use the word in its MOST COMMON grammatical forms and meanings (e.g., as a noun, verb, adjective, adverb) based on how native speakers actually use it. Do NOT just use it as a verb. If a word is both a noun and a verb, provide sentences for BOTH cases.
 2. Sentences MUST provide strong, clear context clues. The user should be able to guess the target word based on the rich context of the sentence alone.
 3. Sentences must sound completely native and natural — like something a native English speaker would actually say in real life.
 4. Difficulty: medium (everyday conversational to light academic).
 5. Length: medium (8-16 words per sentence).
-6. Replace the target word (or its grammatical form) with "___" (three underscores).
-7. The word may appear in different grammatical forms (e.g., "leave" → "left", "leaving", "leaves").
-8. Each sentence should use a DIFFERENT meaning or context of the word when possible.
+6. Replace the target word (or its grammatically modified form) with "___" (three underscores).
+7. The word may appear in different grammatical forms (e.g., "leave" → "left", "leaving", "leaves" OR "act" → "acting", "action", "active").
+8. Each sentence MUST use a DIFFERENT meaning, context, or grammatical role of the word.
 9. Turkish translations must be natural and fluent — not word-by-word translations. Capture the exact nuanced meaning the word has in that specific sentence.
-10. The "hint" field should contain the exact Turkish meaning of the word form used in that sentence.
+10. The "hint" field should contain the exact Turkish meaning of the word form used in that specific sentence (e.g. if used as a noun, give noun meaning; if verb, give verb meaning).
 
 Return ONLY a valid JSON array with exactly ${count} objects in this format:
 [
