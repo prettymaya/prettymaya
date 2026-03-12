@@ -974,7 +974,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.phaseReading.style.display = 'none';
 
         // Check if retry
-        const state = currentSession.wordState.get(card.word);
+        const state = currentSession.wordState.get(card.cardKey);
         if (state.needsConfirmation) {
             els.retryIndicator.style.display = 'inline-flex';
         } else {
