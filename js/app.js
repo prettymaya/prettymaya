@@ -33,7 +33,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         detailWordTitle: document.getElementById('detail-word-title'),
         detailSentenceCount: document.getElementById('detail-sentence-count'),
         detailSentencesList: document.getElementById('detail-sentences-list'),
-        btnAddMoreSentences: document.getElementById('btn-add-more-sentences'),
+        btnCloseDetailModal1: document.getElementById('btn-close-detail-modal1'),
+        btnCloseDetailModal2: document.getElementById('btn-close-detail-modal2'),
+        btnGenerate5Sentences: document.getElementById('btn-generate-5-sentences'),
         btnDeleteWord: document.getElementById('btn-delete-word'),
 
         // Generation Overlay
@@ -105,6 +107,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         readingTurkish: document.getElementById('reading-turkish'),
         readingHint: document.getElementById('reading-hint'),
         btnReadingNext: document.getElementById('btn-reading-next'),
+        btnQuitSession: document.getElementById('btn-quit-session'),
         
         resIcon: document.getElementById('res-icon'),
         resWord: document.getElementById('res-word'),
@@ -416,7 +419,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // ─── Modals Logic ───────────────────────────────────────
-    document.querySelectorAll('.modal-close, #btn-close-detail-modal2').forEach(btn => {
+    document.querySelectorAll('.modal-close, #btn-close-detail-modal1, #btn-close-detail-modal2').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.target.closest('.modal-overlay').classList.remove('visible');
         });
@@ -805,6 +808,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSession.handleAnswer(true);
         }
         loadNextCard();
+    });
+
+    els.btnQuitSession.addEventListener('click', () => {
+        if(confirm('Pratik oturumunu şu anki ilerlemenizle bitirmek istediğinize emin misiniz?')) {
+            finishSessionUI();
+        }
     });
 
     els.btnStartSession.addEventListener('click', async () => {

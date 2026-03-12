@@ -275,17 +275,17 @@
 
                         <!-- Reading Phase -->
                         <div id="phase-reading" style="display: none; text-align: center;">
-                            <h3 class="flashcard-sentence" id="reading-sentence" style="font-size: 1.4rem; font-weight: 500;">
+                            <h3 class="flashcard-sentence" id="reading-sentence" style="font-size: 1.8rem; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">
                                 <!-- Full sentence with highlighted word -->
                             </h3>
                             
-                            <div class="result-turkish" style="display: block; margin: 24px auto; max-width: 90%;">
-                                <div class="label">Cümlenin Çevirisi</div>
-                                <div id="reading-turkish" style="font-size: 1.15rem; color: var(--text-primary); font-weight: 400;">Türkçe çevirisi</div>
+                            <div style="margin-top: 8px; margin-bottom: 24px; color: var(--text-muted); font-size: 0.95rem;">
+                                Hedef Kelime: <strong id="reading-hint" style="color: var(--accent-purple-light);"></strong>
                             </div>
                             
-                            <div style="margin-top: 16px; margin-bottom: 32px; color: var(--text-muted); font-size: 0.95rem;">
-                                Kelimenin Anlamı: <strong id="reading-hint" style="color: var(--accent-purple-light);"></strong>
+                            <div class="result-turkish" style="display: block; margin: 0 auto 32px auto; max-width: 90%; background: transparent; border: 1px dashed var(--border); padding: 16px;">
+                                <div class="label" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;"><i class="fa-solid fa-language"></i> Cümlenin Çevirisi</div>
+                                <div id="reading-turkish" style="font-size: 1.05rem; color: var(--text-secondary); font-weight: 300;">Türkçe çevirisi</div>
                             </div>
 
                             <button class="btn btn-primary btn-lg" id="btn-reading-next" style="width: 100%; max-width: 300px;">
@@ -494,6 +494,9 @@
             </div>
             <div class="modal-footer" style="justify-content: space-between;">
                 <button class="btn btn-danger btn-sm" id="btn-delete-word">Kelimeyi Sil</button>
+                <button class="btn btn-secondary btn-sm" id="btn-generate-5-sentences" style="color:var(--accent-purple-light);">
+                    <i class="fa-solid fa-plus"></i> 5 Cümle Üret
+                </button>
                 <button class="btn btn-secondary" id="btn-close-detail-modal2">Kapat</button>
             </div>
         </div>
