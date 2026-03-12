@@ -29,18 +29,19 @@ const GeminiService = {
     },
 
     buildPrompt(word, count = 10) {
-        return `You are an expert English teacher creating vocabulary exercises. Generate exactly ${count} fill-in-the-blank sentences for the English word "${word}".
+        return `You are an expert English teacher creating vocabulary active recall exercises. Generate exactly ${count} fill-in-the-blank sentences for the English word "${word}".
 
 STRICT RULES:
-1. Use the word's most common and natural meanings
-2. Sentences must sound completely native and natural — like something a native English speaker would actually say
-3. Difficulty: medium (not too easy, not too hard — everyday conversational to light academic)
-4. Length: medium (8-15 words per sentence)
-5. Replace the target word (or its grammatical form) with "___" (three underscores)
-6. The word may appear in different grammatical forms (e.g., "leave" → "left", "leaving", "leaves")
-7. Each sentence should use a DIFFERENT meaning or context of the word when possible
-8. Turkish translations must be natural and fluent — not word-by-word translations
-9. The "hint" field should contain the Turkish meaning of the specific form used in that sentence
+1. Use the word's most common and natural meanings.
+2. Sentences MUST provide strong, clear context clues. The user should be able to guess the target word based on the rich context of the sentence alone.
+3. Sentences must sound completely native and natural — like something a native English speaker would actually say in real life.
+4. Difficulty: medium (everyday conversational to light academic).
+5. Length: medium (8-16 words per sentence).
+6. Replace the target word (or its grammatical form) with "___" (three underscores).
+7. The word may appear in different grammatical forms (e.g., "leave" → "left", "leaving", "leaves").
+8. Each sentence should use a DIFFERENT meaning or context of the word when possible.
+9. Turkish translations must be natural and fluent — not word-by-word translations. Capture the exact nuanced meaning the word has in that specific sentence.
+10. The "hint" field should contain the exact Turkish meaning of the word form used in that sentence.
 
 Return ONLY a valid JSON array with exactly ${count} objects in this format:
 [

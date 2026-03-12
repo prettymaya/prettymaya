@@ -206,3 +206,60 @@ class SessionManager {
         };
     }
 }
+
+class ReadingSessionManager {
+    constructor(wordSentencesMap, sentencesPerWord) {
+        this.mainQueue = [];
+        this.position = 0;
+        this.stats = { total: 0, correct: 0, incorrect: 0 };
+        
+        for (const [word, sentences] of wordSentencesMap) {
+            if (sentences.length === 0) continue;
+            
+            // shuffle the sentences for this word
+            const shuffled = [...sentences];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            
+            // take up to specified sentencesPerWord
+            const toTake = Math.min(sentencesPerWord, shuffled.length);
+            for(let i = 0; i < toTake; i++) {
+                this.mainQueue.push({
+                    word,
+                    sentence: shuffled[i]
+                });
+            }
+        }
+        
+        // shuffle the entire reading queue
+        for (let i = this.mainQueue.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.mainQueue[i], this.mainQueue[j]] = [this.mainQueue[j], this.mainQueue[i]];
+        }
+        
+        this.stats.total = this.mainQueue.length;
+        this.currentCard = null;
+    }
+
+    getNextCard() {
+        if (this.mainQueue.length > 0) {
+            this.currentCard = this.mainQueue.shift();
+            this.position++;
+            this.stats.correct = this.position; // For progress bar purposes
+            return this.currentCard;
+        }
+        this.currentCard = null;
+        return null;
+    }
+
+    getProgress() {
+        return {
+            totalWords: this.stats.total,
+            remaining: this.mainQueue.length,
+            percentage: this.stats.total > 0 ? Math.round((this.position / this.stats.total) * 100) : 0,
+            stats: this.stats
+        };
+    }
+}

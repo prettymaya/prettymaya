@@ -160,6 +160,26 @@
                             <button class="word-count-btn" data-count="all">Tümü</button>
                         </div>
                         
+                        <div class="card-header" style="justify-content: center; margin-top: 16px;">
+                            <h3 class="card-title">Pratik Modu</h3>
+                        </div>
+                        <div class="action-bar" style="justify-content: center; margin-bottom: 24px;">
+                            <button class="btn btn-primary" id="mode-active-recall">Boşluk Doldurma</button>
+                            <button class="btn btn-secondary" id="mode-reading">Sadece Okuma</button>
+                        </div>
+
+                        <!-- Reading Setup specific options -->
+                        <div id="reading-setup-options" style="display: none; text-align: center; margin-bottom: 24px;">
+                            <label style="display: block; font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 8px;">Her kelime için kaç cümle okumak istiyorsun?</label>
+                            <select id="reading-sentence-count" style="padding: 10px; border-radius: 8px; background: var(--bg-glass); color: white; border: 1px solid var(--border);">
+                                <option value="1">1 Cümle</option>
+                                <option value="2">2 Cümle</option>
+                                <option value="3" selected>3 Cümle</option>
+                                <option value="5">5 Cümle</option>
+                                <option value="10">10 Cümle</option>
+                            </select>
+                        </div>
+
                         <button class="btn btn-primary btn-lg" id="btn-start-session" style="width: 100%;">
                             Oturumu Başlat <i class="fa-solid fa-arrow-right"></i>
                         </button>
@@ -243,6 +263,26 @@
 
                             <button class="btn btn-primary" id="btn-next" style="margin-top: 20px; width: 100%; max-width: 300px;">
                                 Sıradaki <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+
+                        <!-- Reading Phase -->
+                        <div id="phase-reading" style="display: none; text-align: center;">
+                            <h3 class="flashcard-sentence" id="reading-sentence" style="font-size: 1.4rem; font-weight: 500;">
+                                <!-- Full sentence with highlighted word -->
+                            </h3>
+                            
+                            <div class="result-turkish" style="display: block; margin: 24px auto; max-width: 90%;">
+                                <div class="label">Cümlenin Çevirisi</div>
+                                <div id="reading-turkish" style="font-size: 1.15rem; color: var(--text-primary); font-weight: 400;">Türkçe çevirisi</div>
+                            </div>
+                            
+                            <div style="margin-top: 16px; margin-bottom: 32px; color: var(--text-muted); font-size: 0.95rem;">
+                                Kelimenin Anlamı: <strong id="reading-hint" style="color: var(--accent-purple-light);"></strong>
+                            </div>
+
+                            <button class="btn btn-primary btn-lg" id="btn-reading-next" style="width: 100%; max-width: 300px;">
+                                Anladım, Sıradaki <i class="fa-solid fa-chevron-right"></i>
                             </button>
                         </div>
 

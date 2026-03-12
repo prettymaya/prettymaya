@@ -61,6 +61,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnStartSession: document.getElementById('btn-start-session'),
         countSelectors: document.querySelectorAll('.word-count-btn'),
         
+        // Mode Selectors
+        btnModeRecall: document.getElementById('mode-active-recall'),
+        btnModeReading: document.getElementById('mode-reading'),
+        readingSetupOpts: document.getElementById('reading-setup-options'),
+        selectReadingCount: document.getElementById('reading-sentence-count'),
+        
         // Custom Practice Modal
         btnShowCustomPractice: document.getElementById('btn-show-custom-practice'),
         modalCustomPractice: document.getElementById('modal-custom-practice'),
@@ -83,6 +89,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         phaseQuestion: document.getElementById('phase-question'),
         phaseResult: document.getElementById('phase-result'),
         phaseWriting: document.getElementById('phase-writing'),
+        phaseReading: document.getElementById('phase-reading'),
+        
+        readingSentence: document.getElementById('reading-sentence'),
+        readingTurkish: document.getElementById('reading-turkish'),
+        readingHint: document.getElementById('reading-hint'),
+        btnReadingNext: document.getElementById('btn-reading-next'),
         
         resIcon: document.getElementById('res-icon'),
         resWord: document.getElementById('res-word'),
@@ -108,12 +120,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     let cancelGeneration = false;
     let currentSession = null;
     let selectedWordCount = 20;
+    let practiceMode = 'recall'; // 'recall' | 'reading'
     let searchTimeout = null;
     let currentDetailWord = null;
 
     // ─── Initialization ─────────────────────────────────────
     try {
         await DB.init();
+        
+        // Auto-import data.json if DB is completely empty (For GitHub / fresh starts)
+        const allW = await DB.getAllWords();
+        if (allW.length === 0) {
+            try {
+                const res = await fetch('data.json');
+                if (res.ok) {
+                    const jsonData = await res.json();
+                    await DB.importAll(jsonData);
+                    showToast('Başlangıç veritabanı başarıyla yüklendi.', 'success');
+                }
+            } catch(e) {
+                // data.json doesnt exist or couldn't fetch, ignore
+            }
+        }
+        
         await loadSettings();
         await updateDashboard();
         showToast('Veritabanı hazır.', 'success');
@@ -617,7 +646,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        currentSession = new SessionManager(readyWordsMap);
+        if (practiceMode === 'reading') {
+            const c = parseInt(els.selectReadingCount.value);
+            currentSession = new ReadingSessionManager(readyWordsMap, c);
+        } else {
+            currentSession = new SessionManager(readyWordsMap);
+        }
         
         els.practiceSetup.style.display = 'none';
         els.practiceComplete.style.display = 'none';
@@ -629,6 +663,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelector('[data-target="view-practice"]').click();
         loadNextCard();
     }
+
+        // Mode toggles
+    els.btnModeRecall.addEventListener('click', () => {
+        practiceMode = 'recall';
+        els.btnModeRecall.className = 'btn btn-primary';
+        els.btnModeReading.className = 'btn btn-secondary';
+        els.readingSetupOpts.style.display = 'none';
+        els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle pratik yapmak istiyorsun?';
+        els.countSelectors[0].parentElement.style.display = 'flex';
+    });
+    
+    els.btnModeReading.addEventListener('click', () => {
+        practiceMode = 'reading';
+        els.btnModeReading.className = 'btn btn-primary';
+        els.btnModeRecall.className = 'btn btn-secondary';
+        els.readingSetupOpts.style.display = 'block';
+        els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelime okumak istiyorsun?';
+        els.countSelectors[0].parentElement.style.display = 'flex';
+    });
+    
+    els.btnReadingNext.addEventListener('click', () => {
+        loadNextCard();
+    });
 
     els.btnStartSession.addEventListener('click', async () => {
         const readyWordsMap = new Map();
@@ -665,8 +722,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const filteredMap = new Map(wordsToUse);
 
-        // Init Session Manager
-        currentSession = new SessionManager(filteredMap);
+        // Init Session Manager based on mode
+        if (practiceMode === 'reading') {
+            const c = parseInt(els.selectReadingCount.value);
+            currentSession = new ReadingSessionManager(filteredMap, c);
+        } else {
+            currentSession = new SessionManager(filteredMap);
+        }
         
         // UI Reset
         els.practiceSetup.style.display = 'none';
@@ -681,9 +743,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function updateProgressUI() {
         const prog = currentSession.getProgress();
-        els.progCurrent.textContent = (currentSession.stats.total - currentSession.mainQueue.length - currentSession.retryInserts.length) + 1;
+        let displayCurrent = 1;
         
-        if (els.progCurrent.textContent > prog.totalWords && prog.totalWords > 0) {
+        if (practiceMode === 'reading') {
+            displayCurrent = prog.stats.correct; // in reading, correct maps to position
+        } else {
+            displayCurrent = (currentSession.stats.total - currentSession.mainQueue.length - currentSession.retryInserts.length) + 1;
+        }
+        
+        els.progCurrent.textContent = displayCurrent;
+        if (displayCurrent > prog.totalWords && prog.totalWords > 0) {
            els.progCurrent.textContent = prog.totalWords; 
         }
 
@@ -704,6 +773,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         updateProgressUI();
+
+        if (practiceMode === 'reading') {
+            els.phaseQuestion.style.display = 'none';
+            els.phaseResult.classList.remove('visible');
+            els.phaseWriting.classList.remove('visible');
+            
+            // Prepare reading card
+            const parts = card.sentence.sentence.split('___');
+            // Ensure proper spacing when joining parts
+            els.readingSentence.innerHTML = parts[0] + `<strong style="color:var(--accent-purple-light)">${card.sentence.answer}</strong>` + (parts[1] || '');
+            els.readingTurkish.textContent = card.sentence.turkish;
+            els.readingHint.textContent = card.sentence.hint;
+            
+            els.retryIndicator.style.display = 'none';
+            els.phaseReading.style.display = 'block';
+            els.btnReadingNext.focus();
+            return;
+        }
+
+        // Active Recall Mode
+        els.phaseReading.style.display = 'none';
 
         // Check if retry
         const state = currentSession.wordState.get(card.word);
@@ -755,7 +845,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     els.btnHint.addEventListener('click', showHint);
 
     els.btnChangeSentence.addEventListener('click', () => {
-        if (!currentSession) return;
+        if (!currentSession || practiceMode === 'reading') return;
         const changed = currentSession.skipToDifferentSentence();
         if (changed) {
             showToast('Farklı bir cümle getirildi 🎉', 'info');
