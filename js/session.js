@@ -1,0 +1,208 @@
+// PrettyMaya - Session Manager (Spaced Repetition within Session)
+class SessionManager {
+    constructor(wordSentencesMap) {
+        // wordSentencesMap: Map<string, Array<{id, sentence, answer, turkish, hint}>>
+        this.wordSentences = wordSentencesMap;
+        this.mainQueue = [];
+        this.retryInserts = []; // {card, insertAtPosition, consecutiveCorrect}
+        this.position = 0;
+        this.completed = new Set();
+        this.stats = { correct: 0, incorrect: 0, total: 0 };
+        this.wordState = new Map(); // Per-word tracking
+
+        // Build initial queue: one random sentence per word
+        for (const [word, sentences] of wordSentencesMap) {
+            if (sentences.length === 0) continue;
+            const idx = Math.floor(Math.random() * sentences.length);
+            const sentence = sentences[idx];
+
+            this.mainQueue.push({
+                word,
+                sentence,
+                usedSentenceIds: new Set([sentence.id])
+            });
+
+            this.wordState.set(word, {
+                needsConfirmation: false,
+                consecutiveCorrect: 0,
+                usedSentenceIds: new Set([sentence.id])
+            });
+        }
+
+        this.shuffleArray(this.mainQueue);
+        this.stats.total = this.mainQueue.length;
+        this.currentCard = null;
+        this.isSessionComplete = false;
+        this.sentenceWritingPhase = false;
+    }
+
+    shuffleArray(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+
+    getNextCard() {
+        // First check for retry cards that are due
+        const dueRetry = this.retryInserts.findIndex(r => r.insertAtPosition <= this.position);
+        if (dueRetry !== -1) {
+            const retryItem = this.retryInserts.splice(dueRetry, 1)[0];
+            this.currentCard = retryItem.card;
+            return this.currentCard;
+        }
+
+        // Then check main queue
+        if (this.mainQueue.length > 0) {
+            this.currentCard = this.mainQueue.shift();
+            return this.currentCard;
+        }
+
+        // Check if there are pending retries
+        if (this.retryInserts.length > 0) {
+            // Force the nearest retry
+            this.retryInserts.sort((a, b) => a.insertAtPosition - b.insertAtPosition);
+            const next = this.retryInserts.shift();
+            this.currentCard = next.card;
+            return this.currentCard;
+        }
+
+        // Session complete
+        this.isSessionComplete = true;
+        this.currentCard = null;
+        return null;
+    }
+
+    handleAnswer(isCorrect) {
+        if (!this.currentCard) return null;
+
+        const card = this.currentCard;
+        const word = card.word;
+        const state = this.wordState.get(word);
+        this.position++;
+
+        const result = {
+            word,
+            isCorrect,
+            correctAnswer: card.sentence.answer,
+            turkishTranslation: card.sentence.turkish,
+            isRetry: state.needsConfirmation,
+            isDone: false
+        };
+
+        if (isCorrect) {
+            this.stats.correct++;
+
+            if (!state.needsConfirmation) {
+                // First time seeing this word & got it right → DONE
+                result.isDone = true;
+                this.completed.add(word);
+            } else {
+                // This is a retry attempt
+                state.consecutiveCorrect++;
+
+                if (state.consecutiveCorrect >= 2) {
+                    // Two consecutive correct after being wrong → DONE
+                    result.isDone = true;
+                    this.completed.add(word);
+                } else {
+                    // One correct, need one more confirmation
+                    result.isDone = false;
+                    this.scheduleRetry(word, state);
+                }
+            }
+        } else {
+            this.stats.incorrect++;
+            state.needsConfirmation = true;
+            state.consecutiveCorrect = 0;
+            this.scheduleRetry(word, state);
+        }
+
+        return result;
+    }
+
+    skipToDifferentSentence() {
+        if (!this.currentCard) return false;
+        
+        const word = this.currentCard.word;
+        const state = this.wordState.get(word);
+        const sentences = this.wordSentences.get(word) || [];
+        
+        // Find unused sentences
+        const unused = sentences.filter(s => !state.usedSentenceIds.has(s.id));
+        let nextSentence;
+        
+        if (unused.length > 0) {
+            nextSentence = unused[Math.floor(Math.random() * unused.length)];
+        } else if (sentences.length > 1) {
+            // Find a sentence that is NOT the current one
+            const others = sentences.filter(s => s.id !== this.currentCard.sentence.id);
+            nextSentence = others[Math.floor(Math.random() * others.length)];
+        } else {
+            // Only 1 sentence exists for this word, can't skip to a different one
+            return false;
+        }
+
+        state.usedSentenceIds.add(nextSentence.id);
+        this.currentCard.sentence = nextSentence;
+        
+        return true;
+    }
+
+    scheduleRetry(word, state) {
+        const sentences = this.wordSentences.get(word) || [];
+        const unused = sentences.filter(s => !state.usedSentenceIds.has(s.id));
+
+        let nextSentence;
+        if (unused.length > 0) {
+            nextSentence = unused[Math.floor(Math.random() * unused.length)];
+        } else {
+            // Reuse a random sentence if all are used
+            nextSentence = sentences[Math.floor(Math.random() * sentences.length)];
+        }
+
+        state.usedSentenceIds.add(nextSentence.id);
+
+        const delay = 3 + Math.floor(Math.random() * 2); // 3-4 cards later
+        this.retryInserts.push({
+            card: {
+                word,
+                sentence: nextSentence,
+                usedSentenceIds: state.usedSentenceIds
+            },
+            insertAtPosition: this.position + delay,
+            consecutiveCorrect: state.consecutiveCorrect
+        });
+    }
+
+    checkAnswer(userInput) {
+        if (!this.currentCard) return false;
+        const correct = this.currentCard.sentence.answer.toLowerCase().trim();
+        const input = userInput.toLowerCase().trim();
+        return input === correct;
+    }
+
+    getProgress() {
+        const totalWords = this.wordState.size;
+        const completedWords = this.completed.size;
+        const remaining = this.mainQueue.length + this.retryInserts.length;
+
+        return {
+            completedWords,
+            totalWords,
+            percentage: totalWords > 0 ? Math.round((completedWords / totalWords) * 100) : 0,
+            remaining,
+            stats: { ...this.stats }
+        };
+    }
+
+    getHint() {
+        if (!this.currentCard) return null;
+        const s = this.currentCard.sentence;
+        return {
+            turkishMeaning: s.hint,
+            firstLetter: s.answer.charAt(0).toUpperCase()
+        };
+    }
+}

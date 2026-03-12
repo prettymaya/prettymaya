@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vocabulary Recall</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="icon" type="image/png" href="icon.png">
+    <!-- Icons: FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <div class="app-layout">
+        <!-- Desktop Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="logo"><img src="icon.png" style="width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-sm);" alt="Logo"></div>
+                <h1>Vocab Recall</h1>
+            </div>
+
+            <nav class="nav-links">
+                <a class="nav-link active" data-target="view-dashboard">
+                    <span class="icon"><i class="fa-solid fa-house"></i></span>
+                    <span class="text">Gösterge Paneli</span>
+                </a>
+                <a class="nav-link" data-target="view-words">
+                    <span class="icon"><i class="fa-solid fa-book"></i></span>
+                    <span class="text">Kelimelerim</span>
+                </a>
+                <a class="nav-link" data-target="view-practice">
+                    <span class="icon"><i class="fa-solid fa-brain"></i></span>
+                    <span class="text">Pratik Yap</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer" style="margin-top: auto;">
+                <a class="nav-link" data-target="view-settings">
+                    <span class="icon"><i class="fa-solid fa-gear"></i></span>
+                    <span class="text">Ayarlar</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+
+            <!-- 1. Dashboard View -->
+            <section id="view-dashboard" class="view active">
+                <div class="view-header">
+                    <h2>Gösterge Paneli</h2>
+                    <p>Öğrenme istatistiklerin ve genel durumun.</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon purple"><i class="fa-solid fa-book"></i></div>
+                        <div class="stat-info">
+                            <h3 id="stat-total-words">0</h3>
+                            <p>Toplam Kelime</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green"><i class="fa-solid fa-quote-left"></i></div>
+                        <div class="stat-info">
+                            <h3 id="stat-total-sentences">0</h3>
+                            <p>Toplam Cümle</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon blue"><i class="fa-solid fa-fire"></i></div>
+                        <div class="stat-info">
+                            <h3 id="stat-total-sessions">0</h3>
+                            <p>Pratik Oturumu</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-bottom: 24px;">
+                    <div class="card-header">
+                        <h3 class="card-title">Hızlı Eylemler</h3>
+                    </div>
+                    <div class="action-bar">
+                        <button class="btn btn-primary" id="btn-quick-practice">
+                            <i class="fa-solid fa-play"></i> Hemen Pratik Yap
+                        </button>
+                        <button class="btn btn-secondary" id="btn-add-words-dash">
+                            <i class="fa-solid fa-plus"></i> Kelime Ekle
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. Words Management View -->
+            <section id="view-words" class="view">
+                <div class="view-header">
+                    <h2>Kelimelerim</h2>
+                    <p>Kelime listeni yönet, eksik cümleleri üret.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header" style="flex-direction: column; align-items: stretch; gap: 16px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <h3 class="card-title">Tüm Kelimeler</h3>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-primary btn-sm" id="btn-generate-missing">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Eksikleri Üret
+                                </button>
+                                <button class="btn btn-secondary btn-sm" id="btn-show-add-modal">
+                                    <i class="fa-solid fa-plus"></i> Ekle
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="search-wrapper">
+                            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                            <input type="text" id="input-search-words" placeholder="Kelime ara...">
+                        </div>
+                    </div>
+
+                    <div class="word-list-container">
+                        <table class="word-list-table">
+                            <thead>
+                                <tr>
+                                    <th>Kelime</th>
+                                    <th>Cümle Sayısı</th>
+                                    <th>Durum</th>
+                                    <th style="width: 100px;">İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="word-list-body">
+                                <!-- JS ile doldurulacak -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. Practice View -->
+            <section id="view-practice" class="view">
+                <div class="view-header">
+                    <h2>Pratik Yap</h2>
+                    <p>Kelimeleri cümle içinde pekiştir.</p>
+                </div>
+
+                <!-- A: Session Setup -->
+                <div id="practice-setup" class="session-setup">
+                    <div class="card">
+                        <div class="card-header" style="justify-content: center;">
+                            <h3 class="card-title"><i class="fa-solid fa-layer-group" style="color: var(--accent-purple-light); margin-right: 8px;"></i> Yeni Oturum Başlat</h3>
+                        </div>
+                        <p>Kaç kelimeyle pratik yapmak istiyorsun?</p>
+                        
+                        <div class="word-count-selector" id="session-count-selector">
+                            <button class="word-count-btn" data-count="10">10 Kelime</button>
+                            <button class="word-count-btn selected" data-count="20">20 Kelime</button>
+                            <button class="word-count-btn" data-count="50">50 Kelime</button>
+                            <button class="word-count-btn" data-count="all">Tümü</button>
+                        </div>
+                        
+                        <button class="btn btn-primary btn-lg" id="btn-start-session" style="width: 100%;">
+                            Oturumu Başlat <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+
+                        <div style="margin-top: 24px; text-align: center;">
+                            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px; border-top: 1px solid var(--border); padding-top: 20px;">Veya kendi kelime listenle özel pratik yap:</p>
+                            <button class="btn btn-secondary" id="btn-show-custom-practice">
+                                <i class="fa-solid fa-paste"></i> Özel Listeyle Pratik Yap
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- B: Active Session (Flashcard) -->
+                <div id="practice-active" class="practice-container" style="display: none;">
+                    
+                    <div class="progress-bar-container">
+                        <div class="progress-info">
+                            <span>Soru <span id="session-current">1</span> / <span id="session-total">20</span></span>
+                            <div class="progress-stats">
+                                <span style="color: var(--success);"><i class="fa-solid fa-check"></i> <span id="session-correct">0</span></span>
+                                <span style="color: var(--error);"><i class="fa-solid fa-xmark"></i> <span id="session-incorrect">0</span></span>
+                            </div>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="session-progress" style="width: 0%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="flashcard" id="flashcard">
+                        <div id="retry-indicator" class="retry-badge" style="display: none;">
+                            <i class="fa-solid fa-rotate-right"></i> Tekrar Deneme
+                        </div>
+                        
+                        <!-- Question Phase -->
+                        <div id="phase-question">
+                            <h3 class="flashcard-sentence" id="fc-sentence">
+                                <!-- Sentence with blanks -->
+                            </h3>
+                            
+                            <input type="text" class="flashcard-input" id="fc-input" placeholder="Boşluğu doldur..." autocomplete="off">
+                            
+                            <div class="flashcard-actions">
+                                <button class="btn btn-secondary" id="btn-change-sentence" type="button" title="Bu kelime için farklı cümle getir">
+                                    <i class="fa-solid fa-shuffle"></i>
+                                </button>
+                                <button class="btn btn-secondary" id="btn-hint" type="button">
+                                    <i class="fa-solid fa-lightbulb" style="color: var(--warning);"></i> İpucu Göster
+                                </button>
+                                <button class="btn btn-primary" id="btn-check" type="button">
+                                    Kontrol Et
+                                </button>
+                            </div>
+                            
+                            <div class="checkbox-wrapper" style="margin-top: 16px; justify-content: center;">
+                                <input type="checkbox" id="check-auto-hint">
+                                <label for="check-auto-hint">Otomatik İpucu Göster</label>
+                            </div>
+
+                            <div class="flashcard-hint" id="fc-hint">
+                                <span class="hint-turkish" id="hint-tr">anlamı</span>
+                                <span class="hint-letter" id="hint-letter">İlk Harf: A</span>
+                            </div>
+                        </div>
+
+                        <!-- Result Phase -->
+                        <div id="phase-result" class="result-display">
+                            <div class="result-icon" id="res-icon">✅</div>
+                            <div class="result-word correct-word" id="res-word">word</div>
+                            
+                            <div class="result-turkish">
+                                <div class="label">Cümlenin Çevirisi</div>
+                                <div id="res-turkish">Türkçe çeviri burada yer alacak.</div>
+                            </div>
+
+                            <!-- Sentence Writing (Optional block after correct) -->
+                            <div class="sentence-writing" id="phase-writing">
+                                <label><strong>Harika!</strong> Şimdi sen bu kelimeyle bir cümle kur (Analiz edilmez, sadece pratik):</label>
+                                <input type="text" class="sentence-writing-input" id="writing-input" placeholder="Örn: He left the keys on the table.">
+                            </div>
+
+                            <button class="btn btn-primary" id="btn-next" style="margin-top: 20px; width: 100%; max-width: 300px;">
+                                Sıradaki <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- C: Session Results -->
+                <div id="practice-complete" class="session-complete" style="display: none;">
+                    <div class="emoji">🎉</div>
+                    <h2>Harika İş!</h2>
+                    <p>Oturumu başarıyla tamamladın.</p>
+                    
+                    <div class="stats-row">
+                        <div class="stat-item">
+                            <div class="number" style="color: var(--success);" id="complete-correct">0</div>
+                            <div class="label">Doğru</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="number" style="color: var(--error);" id="complete-incorrect">0</div>
+                            <div class="label">Yanlış</div>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-primary btn-lg" id="btn-finish-session">
+                        Panoya Dön
+                    </button>
+                </div>
+            </section>
+
+            <!-- 4. Settings View -->
+            <section id="view-settings" class="view">
+                <div class="view-header">
+                    <h2>Ayarlar</h2>
+                    <p>Uygulama tercihleri ve API ayarları.</p>
+                </div>
+
+                <div class="card settings-section">
+                    <h3><i class="fa-solid fa-key" style="color: var(--warning);"></i> Gemini API Yapılandırması</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+                        Cümle üretimi için Gemini 2.5 Flash-Lite API kullanılır. Ücretsiz Google AI Studio hesabı ile bir API anahtarı alabilirsiniz.
+                    </p>
+                    
+                    <div class="input-group">
+                        <label for="setting-api-key">API Anahtarı (Gemini 2.5)</label>
+                        <div class="api-key-input-wrapper">
+                            <input type="password" id="setting-api-key" placeholder="AI Studio'dan aldığınız anahtarı girin..." autocomplete="off">
+                            <button class="btn btn-secondary" id="btn-test-api">
+                                Test Et
+                            </button>
+                        </div>
+                        <div id="api-status" style="margin-top: 8px; font-size: 0.8rem;"></div>
+                    </div>
+                    
+                    <div class="input-group" style="margin-top: 20px;">
+                        <label for="setting-min-sentences">Minimum Cümle Sayısı (Varsayılan: 10)</label>
+                        <select id="setting-min-sentences" style="width: 100px;">
+                            <option value="5">5</option>
+                            <option value="10" selected>10</option>
+                            <option value="15">15</option>
+                            <option value="20">20</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-primary" id="btn-save-settings" style="margin-top: 16px;">
+                        Ayarları Kaydet
+                    </button>
+                </div>
+
+                <div class="card settings-section">
+                    <h3><i class="fa-solid fa-database" style="color: var(--info);"></i> Veri Yönetimi</h3>
+                    
+                    <div class="action-bar" style="margin-top: 16px;">
+                        <button class="btn btn-secondary" id="btn-export-db">
+                            <i class="fa-solid fa-download"></i> Yedeği İndir
+                        </button>
+                        <button class="btn btn-secondary" id="btn-import-db-wrapper" style="position: relative; overflow: hidden;">
+                            <i class="fa-solid fa-upload"></i> Yedeği Yükle
+                            <input type="file" id="input-import-db" accept=".json" style="position: absolute; top: 0; right: 0; min-width: 100%; min-height: 100%; font-size: 100px; opacity: 0; cursor: pointer; display: block;">
+                        </button>
+                        <button class="btn btn-secondary" style="color: var(--error); border-color: rgba(248,113,113,0.3);" id="btn-danger-reset">
+                            <i class="fa-solid fa-trash"></i> Tüm Verileri Sil
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Mobile Bottom Nav -->
+        <nav class="mobile-nav">
+            <div class="mobile-nav-links">
+                <a class="mobile-nav-link active" data-target="view-dashboard">
+                    <span class="icon"><i class="fa-solid fa-house"></i></span>
+                    <span class="text">Pano</span>
+                </a>
+                <a class="mobile-nav-link" data-target="view-words">
+                    <span class="icon"><i class="fa-solid fa-book"></i></span>
+                    <span class="text">Kelimeler</span>
+                </a>
+                <a class="mobile-nav-link" data-target="view-practice">
+                    <span class="icon"><i class="fa-solid fa-brain"></i></span>
+                    <span class="text">Pratik</span>
+                </a>
+                <a class="mobile-nav-link" data-target="view-settings">
+                    <span class="icon"><i class="fa-solid fa-gear"></i></span>
+                    <span class="text">Ayarlar</span>
+                </a>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Modals -->
+    
+    <!-- 1. Add Words Modal -->
+    <div class="modal-overlay" id="modal-add-words">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Kelimeleri Ekle</h3>
+                <button class="modal-close" id="btn-close-add-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
+                    Eklemek istediğiniz kelimeleri alt alta yapıştırın. (Örn: binlerce kelime listesini buraya yapıştırabilirsiniz).
+                </p>
+                <textarea id="input-word-list" placeholder="hello&#10;world&#10;computer&#10;science..."></textarea>
+                
+                <div class="checkbox-wrapper" style="margin-top: 16px;">
+                    <input type="checkbox" id="check-auto-generate" checked>
+                    <label for="check-auto-generate">Eklendikten sonra eksik cümleleri otomatik üret (API Anahtarı gerektirir)</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="btn-cancel-add">İptal</button>
+                <button class="btn btn-primary" id="btn-confirm-add">Kelimeleri Ekle</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Word Details Modal -->
+    <div class="modal-overlay" id="modal-word-details">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Kelime Detayı: <span id="detail-word-title" style="color: var(--accent-purple-light);"></span></h3>
+                <button class="modal-close" id="btn-close-detail-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div>
+                        <span style="color: var(--text-secondary); font-size: 0.9rem;">Mevcut Cümle: </span>
+                        <strong id="detail-sentence-count">0</strong>
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="btn-add-more-sentences">
+                        <i class="fa-solid fa-plus"></i> +5 Cümle Üret
+                    </button>
+                </div>
+
+                <div class="word-list-container" style="max-height: 300px;">
+                    <table class="word-list-table">
+                        <thead>
+                            <tr>
+                                <th>Cümle</th>
+                                <th>Cevap</th>
+                                <th style="width: 50px;">Sil</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detail-sentences-list">
+                            <!-- JS fill -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: space-between;">
+                <button class="btn btn-danger btn-sm" id="btn-delete-word">Kelimeyi Sil</button>
+                <button class="btn btn-secondary" id="btn-close-detail-modal2">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generation Overlay -->
+    <div class="generation-overlay" id="overlay-generation">
+        <div class="generation-modal">
+            <div class="spinner spinner-lg" style="margin-bottom: 20px;"></div>
+            <h3>Cümleler Üretiliyor...</h3>
+            <div class="gen-status">
+                Kelime işleniyor: <span class="gen-word" id="gen-current-word">bekleniyor</span>
+            </div>
+            <div class="gen-progress-bar">
+                <div class="gen-progress-fill" id="gen-progress-fill" style="width: 0%;"></div>
+            </div>
+            <div class="gen-count"><span id="gen-current-num">0</span> / <span id="gen-total-num">0</span> tamamlandı</div>
+            
+            <button class="btn btn-secondary btn-sm" id="btn-cancel-generation" style="margin-top: 24px;">İptal Et</button>
+        </div>
+    </div>
+
+    <!-- 3. Custom Practice Modal -->
+    <div class="modal-overlay" id="modal-custom-practice">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Özel Liste ile Pratik</h3>
+                <button class="modal-close" id="btn-close-custom-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
+                    Pratik yapmak istediğiniz kelimeleri alt alta yapıştırın. Sistem veritabanına bakıp varsa eksik kelimelerin cümlelerini otomatik üretir, ardından <b>sadece</b> bu kelimelerle pratik oturumu başlatır.
+                </p>
+                <textarea id="input-custom-practice-list" placeholder="apple&#10;computer&#10;science..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="btn-cancel-custom">İptal</button>
+                <button class="btn btn-primary" id="btn-start-custom-practice">Analiz Et ve Başla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="js/db.js"></script>
+    <script src="js/gemini.js"></script>
+    <script src="js/session.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
