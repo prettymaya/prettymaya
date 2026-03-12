@@ -1,6 +1,6 @@
 // PrettyMaya - Session Manager (Spaced Repetition within Session)
 class SessionManager {
-    constructor(wordSentencesMap) {
+    constructor(wordSentencesMap, sentencesPerWord = 1) {
         // wordSentencesMap: Map<string, Array<{id, sentence, answer, turkish, hint}>>
         this.wordSentences = wordSentencesMap;
         this.mainQueue = [];
@@ -8,25 +8,37 @@ class SessionManager {
         this.position = 0;
         this.completed = new Set();
         this.stats = { correct: 0, incorrect: 0, total: 0 };
-        this.wordState = new Map(); // Per-word tracking
+        this.wordState = new Map(); // Per-card tracking
 
-        // Build initial queue: one random sentence per word
+        // Build initial queue: 'sentencesPerWord' sentences per word
         for (const [word, sentences] of wordSentencesMap) {
             if (sentences.length === 0) continue;
-            const idx = Math.floor(Math.random() * sentences.length);
-            const sentence = sentences[idx];
+            
+            const shuffled = [...sentences];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            
+            const toTake = Math.min(sentencesPerWord, shuffled.length);
+            
+            for (let i = 0; i < toTake; i++) {
+                const sentence = shuffled[i];
+                const cardKey = `${word}_${sentence.id}`;
 
-            this.mainQueue.push({
-                word,
-                sentence,
-                usedSentenceIds: new Set([sentence.id])
-            });
+                this.mainQueue.push({
+                    cardKey,
+                    word,
+                    sentence,
+                    usedSentenceIds: new Set([sentence.id])
+                });
 
-            this.wordState.set(word, {
-                needsConfirmation: false,
-                consecutiveCorrect: 0,
-                usedSentenceIds: new Set([sentence.id])
-            });
+                this.wordState.set(cardKey, {
+                    needsConfirmation: false,
+                    consecutiveCorrect: 0,
+                    usedSentenceIds: new Set([sentence.id])
+                });
+            }
         }
 
         this.shuffleArray(this.mainQueue);
@@ -79,7 +91,8 @@ class SessionManager {
 
         const card = this.currentCard;
         const word = card.word;
-        const state = this.wordState.get(word);
+        const cardKey = card.cardKey;
+        const state = this.wordState.get(cardKey);
         this.position++;
 
         const result = {
@@ -98,7 +111,7 @@ class SessionManager {
             if (!state.needsConfirmation) {
                 // First time seeing this word & got it right → DONE
                 result.isDone = true;
-                this.completed.add(word);
+                this.completed.add(cardKey);
             } else {
                 // This is a retry attempt
                 state.consecutiveCorrect++;
@@ -106,18 +119,18 @@ class SessionManager {
                 if (state.consecutiveCorrect >= 2) {
                     // Two consecutive correct after being wrong → DONE
                     result.isDone = true;
-                    this.completed.add(word);
+                    this.completed.add(cardKey);
                 } else {
                     // One correct, need one more confirmation
                     result.isDone = false;
-                    this.scheduleRetry(word, state);
+                    this.scheduleRetry(cardKey, word, state);
                 }
             }
         } else {
             this.stats.incorrect++;
             state.needsConfirmation = true;
             state.consecutiveCorrect = 0;
-            this.scheduleRetry(word, state);
+            this.scheduleRetry(cardKey, word, state);
         }
 
         return result;
@@ -127,7 +140,8 @@ class SessionManager {
         if (!this.currentCard) return false;
         
         const word = this.currentCard.word;
-        const state = this.wordState.get(word);
+        const cardKey = this.currentCard.cardKey;
+        const state = this.wordState.get(cardKey);
         const sentences = this.wordSentences.get(word) || [];
         
         // Find unused sentences
@@ -151,7 +165,7 @@ class SessionManager {
         return true;
     }
 
-    scheduleRetry(word, state) {
+    scheduleRetry(cardKey, word, state) {
         const sentences = this.wordSentences.get(word) || [];
         const unused = sentences.filter(s => !state.usedSentenceIds.has(s.id));
 
@@ -168,6 +182,7 @@ class SessionManager {
         const delay = 3 + Math.floor(Math.random() * 2); // 3-4 cards later
         this.retryInserts.push({
             card: {
+                cardKey,
                 word,
                 sentence: nextSentence,
                 usedSentenceIds: state.usedSentenceIds

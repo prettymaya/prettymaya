@@ -796,7 +796,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const c = parseInt(els.selectReadingCount.value);
             currentSession = new ReadingSessionManager(readyWordsMap, c);
         } else {
-            currentSession = new SessionManager(readyWordsMap);
+            const c = parseInt(els.selectReadingCount.value);
+            currentSession = new SessionManager(readyWordsMap, c);
         }
         
         els.practiceSetup.style.display = 'none';
@@ -816,7 +817,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnModeRecall.className = 'btn btn-primary';
         els.btnModeReading.className = 'btn btn-secondary';
         els.btnModeMixed.className = 'btn btn-secondary';
-        els.readingSetupOpts.style.display = 'none';
+        els.readingSetupOpts.style.display = 'block';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle pratik yapmak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
@@ -836,7 +837,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnModeMixed.className = 'btn btn-primary';
         els.btnModeRecall.className = 'btn btn-secondary';
         els.btnModeReading.className = 'btn btn-secondary';
-        els.readingSetupOpts.style.display = 'none';
+        els.readingSetupOpts.style.display = 'block';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle karma pratik istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
@@ -894,7 +895,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const c = parseInt(els.selectReadingCount.value);
             currentSession = new ReadingSessionManager(filteredMap, c);
         } else {
-            currentSession = new SessionManager(filteredMap);
+            const c = parseInt(els.selectReadingCount.value);
+            currentSession = new SessionManager(filteredMap, c);
         }
         
         // UI Reset
