@@ -196,7 +196,11 @@
 
                 <!-- B: Active Session (Flashcard) -->
                 <div id="practice-active" class="practice-container" style="display: none;">
-                    
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                        <button class="btn btn-ghost btn-sm" id="btn-quit-session" style="color: var(--error);">
+                            <i class="fa-solid fa-right-from-bracket"></i> Pratiği Bitir
+                        </button>
+                    </div>
                     <div class="progress-bar-container">
                         <div class="progress-info">
                             <span>Soru <span id="session-current">1</span> / <span id="session-total">20</span></span>

@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         detailWordTitle: document.getElementById('detail-word-title'),
         detailSentenceCount: document.getElementById('detail-sentence-count'),
         detailSentencesList: document.getElementById('detail-sentences-list'),
-        btnCloseDetailModal1: document.getElementById('btn-close-detail-modal1'),
+        btnCloseDetailModal1: document.getElementById('btn-close-detail-modal'),
         btnCloseDetailModal2: document.getElementById('btn-close-detail-modal2'),
         btnGenerate5Sentences: document.getElementById('btn-generate-5-sentences'),
         btnDeleteWord: document.getElementById('btn-delete-word'),
