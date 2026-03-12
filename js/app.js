@@ -625,27 +625,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    els.btnAddMoreSentences.addEventListener('click', async () => {
-        if (!currentDetailWord) return;
-        
-        const btn = els.btnAddMoreSentences;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;margin-right:6px"></span> Üretiliyor...';
-        
-        try {
-            const added = await GeminiService.addMoreSentences(currentDetailWord, 5);
-            showToast(`${added} yeni cümle eklendi!`, 'success');
-            await openWordDetails(currentDetailWord); // Refresh view
-            await updateDashboard();
-            renderWordList();
-        } catch (e) {
-            showToast('Hata: ' + e.message, 'error');
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-plus"></i> +5 Cümle Üret';
-        }
-    });
-
     // ─── Practice Session Logic ─────────────────────────────
     
     // Select count
