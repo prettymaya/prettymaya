@@ -63,6 +63,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnSyncPush: document.getElementById('btn-sync-push'),
         btnSyncPull: document.getElementById('btn-sync-pull'),
         syncStatus: document.getElementById('sync-status'),
+        btnForceRefresh: document.getElementById('btn-force-refresh'),
 
         // Practice
         practiceSetup: document.getElementById('practice-setup'),
@@ -343,6 +344,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.btnSyncPull.disabled = false;
             els.btnSyncPull.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Buluttan Aç (Pull)';
         }
+    });
+
+    els.btnForceRefresh.addEventListener('click', () => {
+        window.location.href = window.location.pathname + '?v=' + new Date().getTime();
     });
 
     els.btnResetDB.addEventListener('click', async () => {
