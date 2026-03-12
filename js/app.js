@@ -795,9 +795,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (practiceMode === 'reading') {
             const c = parseInt(els.selectReadingCount.value);
             currentSession = new ReadingSessionManager(readyWordsMap, c);
-        } else {
+        } else if (practiceMode === 'mixed') {
             const c = parseInt(els.selectReadingCount.value);
             currentSession = new SessionManager(readyWordsMap, c);
+        } else {
+            currentSession = new SessionManager(readyWordsMap, 1);
         }
         
         els.practiceSetup.style.display = 'none';
@@ -817,7 +819,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnModeRecall.className = 'btn btn-primary';
         els.btnModeReading.className = 'btn btn-secondary';
         els.btnModeMixed.className = 'btn btn-secondary';
-        els.readingSetupOpts.style.display = 'block';
+        els.readingSetupOpts.style.display = 'none';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle pratik yapmak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
@@ -894,9 +896,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (practiceMode === 'reading') {
             const c = parseInt(els.selectReadingCount.value);
             currentSession = new ReadingSessionManager(filteredMap, c);
-        } else {
+        } else if (practiceMode === 'mixed') {
             const c = parseInt(els.selectReadingCount.value);
             currentSession = new SessionManager(filteredMap, c);
+        } else {
+            currentSession = new SessionManager(filteredMap, 1);
         }
         
         // UI Reset
