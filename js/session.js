@@ -86,6 +86,7 @@ class SessionManager {
             word,
             isCorrect,
             correctAnswer: card.sentence.answer,
+            fullSentence: card.sentence.sentence,
             turkishTranslation: card.sentence.turkish,
             isRetry: state.needsConfirmation,
             isDone: false

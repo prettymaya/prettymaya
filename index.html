@@ -166,6 +166,7 @@
                         <div class="action-bar" style="justify-content: center; margin-bottom: 24px;">
                             <button class="btn btn-primary" id="mode-active-recall">Boşluk Doldurma</button>
                             <button class="btn btn-secondary" id="mode-reading">Sadece Okuma</button>
+                            <button class="btn btn-secondary" id="mode-mixed">Karışık</button>
                         </div>
 
                         <!-- Reading Setup specific options -->
@@ -229,6 +230,9 @@
                                 <button class="btn btn-secondary" id="btn-hint" type="button">
                                     <i class="fa-solid fa-lightbulb" style="color: var(--warning);"></i> İpucu Göster
                                 </button>
+                                <button class="btn btn-success" id="btn-knew-it" type="button" title="Yazmadan doğru kabul et">
+                                    <i class="fa-solid fa-check-double"></i> Bildim
+                                </button>
                                 <button class="btn btn-primary" id="btn-check" type="button">
                                     Kontrol Et
                                 </button>
@@ -250,6 +254,9 @@
                             <div class="result-icon" id="res-icon">✅</div>
                             <div class="result-word correct-word" id="res-word">word</div>
                             
+                            <!-- Full English sentence with highlighted target -->
+                            <div id="res-english" style="font-size: 1.15rem; line-height: 1.6; margin-top: 16px; margin-bottom: 16px; color: var(--text-primary); font-weight: 400;"></div>
+
                             <div class="result-turkish">
                                 <div class="label">Cümlenin Çevirisi</div>
                                 <div id="res-turkish">Türkçe çeviri burada yer alacak.</div>

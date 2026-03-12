@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Mode Selectors
         btnModeRecall: document.getElementById('mode-active-recall'),
         btnModeReading: document.getElementById('mode-reading'),
+        btnModeMixed: document.getElementById('mode-mixed'),
         readingSetupOpts: document.getElementById('reading-setup-options'),
         selectReadingCount: document.getElementById('reading-sentence-count'),
         
@@ -78,6 +79,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         fcSentence: document.getElementById('fc-sentence'),
         fcInput: document.getElementById('fc-input'),
         btnCheck: document.getElementById('btn-check'),
+        btnKnewIt: document.getElementById('btn-knew-it'),
         btnHint: document.getElementById('btn-hint'),
         btnChangeSentence: document.getElementById('btn-change-sentence'),
         checkAutoHint: document.getElementById('check-auto-hint'),
@@ -98,6 +100,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         resIcon: document.getElementById('res-icon'),
         resWord: document.getElementById('res-word'),
+        resEnglish: document.getElementById('res-english'),
         resTurkish: document.getElementById('res-turkish'),
         writingInput: document.getElementById('writing-input'),
         btnNext: document.getElementById('btn-next'),
@@ -120,7 +123,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     let cancelGeneration = false;
     let currentSession = null;
     let selectedWordCount = 20;
-    let practiceMode = 'recall'; // 'recall' | 'reading'
+    let practiceMode = 'recall'; // 'recall' | 'reading' | 'mixed'
+    let currentCardMode = 'recall';
     let searchTimeout = null;
     let currentDetailWord = null;
 
@@ -669,6 +673,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         practiceMode = 'recall';
         els.btnModeRecall.className = 'btn btn-primary';
         els.btnModeReading.className = 'btn btn-secondary';
+        els.btnModeMixed.className = 'btn btn-secondary';
         els.readingSetupOpts.style.display = 'none';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle pratik yapmak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
@@ -678,12 +683,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         practiceMode = 'reading';
         els.btnModeReading.className = 'btn btn-primary';
         els.btnModeRecall.className = 'btn btn-secondary';
+        els.btnModeMixed.className = 'btn btn-secondary';
         els.readingSetupOpts.style.display = 'block';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelime okumak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
+
+    els.btnModeMixed.addEventListener('click', () => {
+        practiceMode = 'mixed';
+        els.btnModeMixed.className = 'btn btn-primary';
+        els.btnModeRecall.className = 'btn btn-secondary';
+        els.btnModeReading.className = 'btn btn-secondary';
+        els.readingSetupOpts.style.display = 'none';
+        els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle karma pratik istiyorsun?';
+        els.countSelectors[0].parentElement.style.display = 'flex';
+    });
     
     els.btnReadingNext.addEventListener('click', () => {
+        if (practiceMode === 'mixed' && currentSession instanceof SessionManager) {
+            currentSession.handleAnswer(true);
+        }
         loadNextCard();
     });
 
@@ -774,7 +793,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         updateProgressUI();
 
-        if (practiceMode === 'reading') {
+        currentCardMode = practiceMode;
+        if (practiceMode === 'mixed') {
+            currentCardMode = Math.random() > 0.5 ? 'recall' : 'reading';
+        }
+
+        if (currentCardMode === 'reading') {
             els.phaseQuestion.style.display = 'none';
             els.phaseResult.classList.remove('visible');
             els.phaseWriting.classList.remove('visible');
@@ -831,6 +855,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     els.btnCheck.addEventListener('click', handleCheck);
 
+    els.btnKnewIt.addEventListener('click', () => {
+        if (!currentSession) return;
+        const result = currentSession.handleAnswer(true);
+        updateProgressUI();
+        
+        els.fcInput.disabled = true;
+        els.fcInput.classList.add('correct');
+        els.fcInput.value = result.correctAnswer;
+        
+        setTimeout(() => {
+            showResultPhase(result);
+        }, 300);
+    });
+
     function showHint() {
         const hint = currentSession.getHint();
         if (hint) {
@@ -845,7 +883,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     els.btnHint.addEventListener('click', showHint);
 
     els.btnChangeSentence.addEventListener('click', () => {
-        if (!currentSession || practiceMode === 'reading') return;
+        if (!currentSession || currentCardMode === 'reading') return;
         const changed = currentSession.skipToDifferentSentence();
         if (changed) {
             showToast('Farklı bir cümle getirildi 🎉', 'info');
@@ -892,6 +930,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.resWord.textContent = result.correctAnswer;
         els.resWord.className = `result-word ${result.isCorrect ? 'correct-word' : 'incorrect-word'}`;
         
+        // Render english sentence with highlight
+        const parts = result.fullSentence.split('___');
+        const highlightedSent = parts[0] + `<strong style="color:var(--accent-purple-light)">${result.correctAnswer}</strong>` + (parts[1] || '');
+        els.resEnglish.innerHTML = highlightedSent;
+
         els.resTurkish.textContent = result.turkishTranslation;
 
         els.phaseResult.classList.add('visible');
