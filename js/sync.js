@@ -93,10 +93,31 @@ const SyncService = {
         const data = await response.json();
         const file = data.files[this.FILENAME];
         
-        if (!file || !file.content) {
+        if (!file) {
             throw new Error('Gist içinde geçerli bir uygulama verisi bulunamadı.');
         }
 
-        return JSON.parse(file.content);
+        let contentStr = file.content;
+
+        // GitHub Gists API truncates bodies larger than 1MB.
+        // For databases > 1MB, we must fetch the raw_url directly.
+        if (file.truncated && file.raw_url) {
+            const rawResponse = await fetch(file.raw_url, {
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            if (!rawResponse.ok) {
+                throw new Error('Büyük veritabanı (raw) indirilemedi.');
+            }
+            contentStr = await rawResponse.text();
+        }
+
+        if (!contentStr) {
+            throw new Error('Veri okunamadı (Boş içerik).');
+        }
+
+        return JSON.parse(contentStr);
     }
 };
