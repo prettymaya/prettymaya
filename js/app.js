@@ -865,6 +865,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (practiceMode === 'mixed') {
             const c = parseInt(els.selectReadingCount.value);
             currentSession = new SessionManager(readyWordsMap, c);
+        } else if (practiceMode === 'warmup') {
+            const c = parseInt(els.selectReadingCount.value);
+            currentSession = new WarmUpSessionManager(readyWordsMap, c);
         } else {
             currentSession = new SessionManager(readyWordsMap, 1);
         }
