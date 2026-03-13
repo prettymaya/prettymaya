@@ -1089,7 +1089,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             displayCurrent = prog.stats.correct || 1; 
         } else {
             const retries = currentSession.retryInserts ? currentSession.retryInserts.length : 0;
-            displayCurrent = (currentSession.stats.total - currentSession.mainQueue.length - retries) + 1;
+            displayCurrent = (currentSession.stats.total - currentSession.mainQueue.length - retries);
+            if (displayCurrent < 1) displayCurrent = 1;
         }
         
         els.progCurrent.textContent = displayCurrent;
