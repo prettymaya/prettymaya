@@ -293,10 +293,10 @@ class WarmUpSessionManager {
             
             // For warm up, we'll queue the item 'repeatCount' times.
             for (let i = 0; i < repeatCount; i++) {
-                // Get up to 3 random meanings (turkish fields) from the available sentences
+                // Get up to 3 random meanings (short hint fields) from the available sentences
                 const shuffledSentences = [...sentences].sort(() => 0.5 - Math.random());
                 const selectedSentences = shuffledSentences.slice(0, 3);
-                const meanings = selectedSentences.map(s => s.turkish);
+                const meanings = selectedSentences.map(s => s.hint);
 
                 this.mainQueue.push({
                     word: word,
