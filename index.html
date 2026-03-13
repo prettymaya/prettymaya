@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" href="icon.png">
     <!-- Icons: FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="css/style.css?v=9">
+    <link rel="stylesheet" href="css/style.css?v=10">
 </head>
 <body>
 
@@ -198,9 +198,9 @@
                 </div>
 
                 <!-- B: Active Session (Flashcard) -->
-                <div id="practice-active" class="practice-container" style="display: none;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 12px; align-items: center;">
-                        <div style="display: flex; gap: 12px; align-items: center;">
+                <div id="practice-active" class="practice-container" style="display: none; width: 100%; max-width: 800px; box-sizing: border-box; overflow-x: hidden;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 12px; align-items: center; flex-wrap: wrap; gap: 8px;">
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                             <button class="btn btn-ghost btn-sm" id="btn-go-back" style="color: var(--text-secondary); display: none;">
                                 <i class="fa-solid fa-arrow-left"></i> <span class="hide-mobile">Geri</span>
                             </button>
@@ -215,7 +215,7 @@
                             <i class="fa-solid fa-right-from-bracket"></i> <span class="hide-mobile">Bitir</span>
                         </button>
                     </div>
-                    <div class="progress-bar-container">
+                    <div class="progress-bar-container" style="width: 100%; box-sizing: border-box;">
                         <div class="progress-info">
                             <span>Soru <span id="session-current">1</span> / <span id="session-total">20</span></span>
                             <div class="progress-stats">
@@ -577,10 +577,10 @@
     <div class="toast-container" id="toast-container"></div>
 
     <!-- Scripts -->
-    <script src="js/db.js?v=9"></script>
-    <script src="js/sync.js?v=9"></script>
-    <script src="js/gemini.js?v=9"></script>
-    <script src="js/session.js?v=9"></script>
-    <script src="js/app.js?v=9"></script>
+    <script src="js/db.js?v=10"></script>
+    <script src="js/sync.js?v=10"></script>
+    <script src="js/gemini.js?v=10"></script>
+    <script src="js/session.js?v=10"></script>
+    <script src="js/app.js?v=10"></script>
 </body>
 </html>
