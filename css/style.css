@@ -1274,9 +1274,9 @@ textarea {
 /* ─── Action Bar ──────────────────────────────── */
 .action-bar {
     display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 16px;
+    flex-wrap: wrap; /* Allow buttons to drop to next line */
+    gap: 12px;
+    margin-bottom: 24px;
 }
 
 /* ─── Settings Page ───────────────────────────── */
@@ -1372,10 +1372,12 @@ textarea {
 
     .action-bar {
         flex-direction: column;
+        gap: 8px; /* Slightly tighter gap on mobile */
     }
 
     .action-bar .btn {
         width: 100%;
+        margin-bottom: 4px; /* Give each button some breathing room */
     }
 
     .word-list-table th:nth-child(3),
