@@ -76,6 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnModeRecall: document.getElementById('mode-active-recall'),
         btnModeReading: document.getElementById('mode-reading'),
         btnModeMixed: document.getElementById('mode-mixed'),
+        btnModeWarmup: document.getElementById('mode-warmup'),
         readingSetupOpts: document.getElementById('reading-setup-options'),
         selectReadingCount: document.getElementById('reading-sentence-count'),
         
@@ -103,6 +104,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         phaseResult: document.getElementById('phase-result'),
         phaseWriting: document.getElementById('phase-writing'),
         phaseReading: document.getElementById('phase-reading'),
+        phaseWarmup: document.getElementById('phase-warmup'),
+
+        warmupWord: document.getElementById('warmup-word'),
+        warmupMeanings: document.getElementById('warmup-meanings'),
+        btnWarmupNext: document.getElementById('btn-warmup-next'),
         
         readingSentence: document.getElementById('reading-sentence'),
         readingTurkish: document.getElementById('reading-turkish'),
@@ -882,6 +888,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnModeRecall.className = 'btn btn-primary';
         els.btnModeReading.className = 'btn btn-secondary';
         els.btnModeMixed.className = 'btn btn-secondary';
+        els.btnModeWarmup.className = 'btn btn-secondary';
         els.readingSetupOpts.style.display = 'none';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle pratik yapmak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
@@ -892,6 +899,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnModeReading.className = 'btn btn-primary';
         els.btnModeRecall.className = 'btn btn-secondary';
         els.btnModeMixed.className = 'btn btn-secondary';
+        els.btnModeWarmup.className = 'btn btn-secondary';
         els.readingSetupOpts.style.display = 'block';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelime okumak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
@@ -902,11 +910,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnModeMixed.className = 'btn btn-primary';
         els.btnModeRecall.className = 'btn btn-secondary';
         els.btnModeReading.className = 'btn btn-secondary';
+        els.btnModeWarmup.className = 'btn btn-secondary';
         els.readingSetupOpts.style.display = 'block';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle karma pratik istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
+
+    els.btnModeWarmup.addEventListener('click', () => {
+        practiceMode = 'warmup';
+        els.btnModeWarmup.className = 'btn btn-primary';
+        els.btnModeRecall.className = 'btn btn-secondary';
+        els.btnModeReading.className = 'btn btn-secondary';
+        els.btnModeMixed.className = 'btn btn-secondary';
+        els.readingSetupOpts.style.display = 'block';
+        els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle ısınma yapmak istiyorsun?';
+        els.countSelectors[0].parentElement.style.display = 'flex';
+    });
     
+    els.btnWarmupNext.addEventListener('click', () => {
+        loadNextCard();
+    });
+
     els.btnReadingNext.addEventListener('click', () => {
         if (!isReviewingHistory) {
             showXP(5, false); // Reading flat XP
@@ -934,11 +958,36 @@ document.addEventListener('DOMContentLoaded', async () => {
         isReviewingHistory = true;
         els.btnGoBack.style.display = goBackHistory.length > 1 ? 'inline-flex' : 'none';
         
-        if (prevData.mode === 'reading') {
+        if (prevData.mode === 'warmup') {
+            currentCardMode = 'warmup';
+            els.phaseQuestion.style.display = 'none';
+            els.phaseResult.classList.remove('visible');
+            els.phaseWriting.classList.remove('visible');
+            els.phaseReading.style.display = 'none';
+            
+            els.warmupWord.textContent = prevData.card.word;
+            els.warmupMeanings.innerHTML = '';
+            prevData.card.meanings.forEach(meaning => {
+                const div = document.createElement('div');
+                div.style.background = 'rgba(249, 115, 22, 0.1)';
+                div.style.color = '#f97316';
+                div.style.padding = '12px 24px';
+                div.style.borderRadius = '12px';
+                div.style.border = '1px solid rgba(249, 115, 22, 0.2)';
+                div.style.fontSize = '1.1rem';
+                div.style.fontWeight = '500';
+                div.textContent = meaning;
+                els.warmupMeanings.appendChild(div);
+            });
+            
+            els.phaseWarmup.style.display = 'flex';
+            els.btnWarmupNext.focus();
+        } else if (prevData.mode === 'reading') {
             currentCardMode = 'reading';
             els.phaseQuestion.style.display = 'none';
             els.phaseResult.classList.remove('visible');
             els.phaseWriting.classList.remove('visible');
+            els.phaseWarmup.style.display = 'none';
             
             const parts = prevData.card.sentence.sentence.split('___');
             els.readingSentence.innerHTML = parts[0] + `<strong style="color:var(--accent-purple-light)">${prevData.card.sentence.answer}</strong>` + (parts[1] || '');
@@ -950,6 +999,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.btnReadingNext.focus();
         } else {
             currentCardMode = 'recall';
+            els.phaseWarmup.style.display = 'none';
             showResultPhase(prevData.result || {
                 word: prevData.card.word,
                 isCorrect: false,
@@ -1008,6 +1058,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (practiceMode === 'mixed') {
             const c = parseInt(els.selectReadingCount.value);
             currentSession = new SessionManager(filteredMap, c);
+        } else if (practiceMode === 'warmup') {
+            const c = parseInt(els.selectReadingCount.value);
+            currentSession = new WarmUpSessionManager(filteredMap, c);
         } else {
             currentSession = new SessionManager(filteredMap, 1);
         }
@@ -1076,6 +1129,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnGoBack.style.display = goBackHistory.length > 1 ? 'inline-flex' : 'none';
         cardStartTime = Date.now();
 
+        if (currentCardMode === 'warmup') {
+            els.phaseQuestion.style.display = 'none';
+            els.phaseResult.classList.remove('visible');
+            els.phaseWriting.classList.remove('visible');
+            els.phaseReading.style.display = 'none';
+            
+            els.warmupWord.textContent = card.word;
+            
+            // Render meanings
+            els.warmupMeanings.innerHTML = '';
+            card.meanings.forEach(meaning => {
+                const div = document.createElement('div');
+                div.style.background = 'rgba(249, 115, 22, 0.1)';
+                div.style.color = '#f97316'; // orange-500
+                div.style.padding = '12px 24px';
+                div.style.borderRadius = '12px';
+                div.style.border = '1px solid rgba(249, 115, 22, 0.2)';
+                div.style.fontSize = '1.1rem';
+                div.style.fontWeight = '500';
+                div.textContent = meaning;
+                els.warmupMeanings.appendChild(div);
+            });
+            
+            els.phaseWarmup.style.display = 'flex';
+            els.btnWarmupNext.focus();
+            return;
+        }
+
         if (currentCardMode === 'reading') {
             els.phaseQuestion.style.display = 'none';
             els.phaseResult.classList.remove('visible');
@@ -1096,6 +1177,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Active Recall Mode
         els.phaseReading.style.display = 'none';
+        els.phaseWarmup.style.display = 'none';
 
         // Check if retry
         const state = currentSession.wordState.get(card.cardKey);

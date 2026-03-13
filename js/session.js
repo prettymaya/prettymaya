@@ -279,3 +279,60 @@ class ReadingSessionManager {
         };
     }
 }
+
+class WarmUpSessionManager {
+    constructor(wordSentencesMap, repeatCount) {
+        this.mainQueue = [];
+        this.position = 0;
+        this.stats = { total: 0, correct: 0, incorrect: 0 };
+        
+        for (const [word, sentences] of wordSentencesMap) {
+            // Even if there are no sentences, we could still technically show the word,
+            // but for meanings we need sentences.turkish.
+            if (sentences.length === 0) continue;
+            
+            // For warm up, we'll queue the item 'repeatCount' times.
+            for (let i = 0; i < repeatCount; i++) {
+                // Get up to 3 random meanings (turkish fields) from the available sentences
+                const shuffledSentences = [...sentences].sort(() => 0.5 - Math.random());
+                const selectedSentences = shuffledSentences.slice(0, 3);
+                const meanings = selectedSentences.map(s => s.turkish);
+
+                this.mainQueue.push({
+                    word: word,
+                    meanings: [...new Set(meanings)] // ensure unique meanings just in case
+                });
+            }
+        }
+        
+        // shuffle the entire warm up queue
+        for (let i = this.mainQueue.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.mainQueue[i], this.mainQueue[j]] = [this.mainQueue[j], this.mainQueue[i]];
+        }
+        
+        this.stats.total = this.mainQueue.length;
+        this.currentCard = null;
+    }
+
+    getNextCard() {
+        if (this.mainQueue.length > 0) {
+            this.currentCard = this.mainQueue.shift();
+            this.position++;
+            // We use 'correct' just to fill the progress bar gracefully
+            this.stats.correct = this.position; 
+            return this.currentCard;
+        }
+        this.currentCard = null;
+        return null;
+    }
+
+    getProgress() {
+        return {
+            totalWords: this.stats.total,
+            remaining: this.mainQueue.length,
+            percentage: this.stats.total > 0 ? Math.round((this.position / this.stats.total) * 100) : 0,
+            stats: this.stats
+        };
+    }
+}

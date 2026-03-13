@@ -170,6 +170,7 @@
                             <button class="btn btn-primary" id="mode-active-recall">Boşluk Doldurma</button>
                             <button class="btn btn-secondary" id="mode-reading">Sadece Okuma</button>
                             <button class="btn btn-secondary" id="mode-mixed">Karışık</button>
+                            <button class="btn btn-secondary" id="mode-warmup" style="background: rgba(16, 185, 129, 0.15); color: var(--success); border-color: rgba(16, 185, 129, 0.3);">Isınma (Warm Up)</button>
                         </div>
 
                         <!-- Setup specific options -->
@@ -312,6 +313,21 @@
 
                             <button class="btn btn-primary btn-lg" id="btn-reading-next" style="width: 100%; max-width: 300px;">
                                 Anladım, Sıradaki <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Warm Up Phase -->
+                        <div id="phase-warmup" style="display: none; text-align: center; min-height: 300px; display: flex; flex-direction: column; justify-content: center;">
+                            <h2 id="warmup-word" style="font-size: 3.5rem; font-weight: 800; color: var(--success); margin-bottom: 40px; text-transform: lowercase; letter-spacing: 2px; text-shadow: 0 0 20px rgba(52, 211, 153, 0.2);">
+                                word
+                            </h2>
+                            
+                            <div id="warmup-meanings" style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 40px; align-items: center;">
+                                <!-- Meanings injected via JS -->
+                            </div>
+                            
+                            <button class="btn btn-primary btn-lg" id="btn-warmup-next" style="width: 100%; max-width: 300px; margin: 0 auto;">
+                                Sonraki <i class="fa-solid fa-chevron-right"></i>
                             </button>
                         </div>
 
