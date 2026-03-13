@@ -523,9 +523,23 @@ textarea:focus {
     box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
 }
 
-input::placeholder,
-textarea::placeholder {
-    color: var(--text-muted);
+/* ─── Mobile specific fixes ───────────────────── */
+@media (max-width: 480px) {
+    .detail-sentences-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+    
+    .btn-delete-single-sentence {
+        padding: 12px; /* Bigger touch target */
+        margin-left: 10px;
+    }
+
+    .flashcard-sentence {
+        font-size: 1.1rem;
+        padding: 0 10px;
+    }
 }
 
 textarea {
@@ -547,6 +561,7 @@ textarea {
 .word-list-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
 }
 
 .word-list-table th {
@@ -687,6 +702,10 @@ textarea {
     color: var(--text-primary);
     margin-bottom: 32px;
     font-weight: 400;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
 }
 
 .flashcard-sentence .blank {

@@ -117,6 +117,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         writingInput: document.getElementById('writing-input'),
         btnNext: document.getElementById('btn-next'),
 
+        // Gamification & History
+        btnGoBack: document.getElementById('btn-go-back'),
+        gameScoreDisplay: document.getElementById('game-score-display'),
+        gameScore: document.getElementById('game-score'),
+        gameStreak: document.getElementById('game-streak'),
+        streakCount: document.getElementById('streak-count'),
+        xpFlyAnimation: document.getElementById('xp-fly-animation'),
+
         // Progress
         progCurrent: document.getElementById('session-current'),
         progTotal: document.getElementById('session-total'),
@@ -138,7 +146,60 @@ document.addEventListener('DOMContentLoaded', async () => {
     let practiceMode = 'recall'; // 'recall' | 'reading' | 'mixed'
     let currentCardMode = 'recall';
     let searchTimeout = null;
+
+    // Gamification & Go Back State
+    let goBackHistory = []; // Stores recent cards & modes for "Go Back" functionality
+    let isReviewingHistory = false;
+    let gameScore = 0;
+    let currentStreak = 0;
+    let cardStartTime = 0;
+    let baseCardXP = 10;
     let currentDetailWord = null;
+
+    // ─── Gamification Functions ─────────────────────────────
+    function resetGamification() {
+        gameScore = 0;
+        currentStreak = 0;
+        goBackHistory = [];
+        isReviewingHistory = false;
+        els.gameScore.textContent = '0';
+        els.streakCount.textContent = '0';
+        els.gameScoreDisplay.style.visibility = 'visible';
+        els.gameStreak.style.display = 'none';
+        els.btnGoBack.style.display = 'none';
+    }
+
+    function showXP(amount, isCombo) {
+        gameScore += amount;
+        els.gameScore.textContent = gameScore;
+        
+        els.xpFlyAnimation.textContent = `+${amount} XP!`;
+        if (isCombo) els.xpFlyAnimation.textContent = `+${amount} XP! (Hızlı 🔥)`;
+        
+        els.xpFlyAnimation.style.transition = 'none';
+        els.xpFlyAnimation.style.opacity = '1';
+        els.xpFlyAnimation.style.transform = 'translateY(0)';
+        
+        // Force reflow
+        void els.xpFlyAnimation.offsetWidth;
+        
+        els.xpFlyAnimation.style.transition = 'all 0.8s ease-out';
+        els.xpFlyAnimation.style.opacity = '0';
+        els.xpFlyAnimation.style.transform = 'translateY(-40px)';
+    }
+
+    function updateStreak(isCorrect) {
+        if (isCorrect) {
+            currentStreak++;
+            if (currentStreak >= 3) {
+                els.gameStreak.style.display = 'inline-flex';
+                els.streakCount.textContent = currentStreak;
+            }
+        } else {
+            currentStreak = 0;
+            els.gameStreak.style.display = 'none';
+        }
+    }
 
     // ─── Initialization ─────────────────────────────────────
     try {
@@ -802,6 +863,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSession = new SessionManager(readyWordsMap, 1);
         }
         
+        resetGamification();
+        
         els.practiceSetup.style.display = 'none';
         els.practiceComplete.style.display = 'none';
         els.practiceActive.style.display = 'block';
@@ -845,10 +908,56 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     
     els.btnReadingNext.addEventListener('click', () => {
-        if (practiceMode === 'mixed' && currentSession instanceof SessionManager) {
+        if (!isReviewingHistory) {
+            showXP(5, false); // Reading flat XP
+        }
+        if (practiceMode === 'mixed' && currentSession instanceof SessionManager && !isReviewingHistory) {
             currentSession.handleAnswer(true);
         }
         loadNextCard();
+    });
+
+    els.btnGoBack.addEventListener('click', () => {
+        if (goBackHistory.length < 2) return;
+        
+        // Remove current card from history
+        const currentData = goBackHistory.pop();
+        if (currentSession.currentCard) {
+            // Push it back to queue so it can be answered again
+            currentSession.mainQueue.unshift(currentSession.currentCard);
+            currentSession.position--;
+        }
+
+        // Get previous card (leave it in history)
+        const prevData = goBackHistory[goBackHistory.length - 1];
+        
+        isReviewingHistory = true;
+        els.btnGoBack.style.display = goBackHistory.length > 1 ? 'inline-flex' : 'none';
+        
+        if (prevData.mode === 'reading') {
+            currentCardMode = 'reading';
+            els.phaseQuestion.style.display = 'none';
+            els.phaseResult.classList.remove('visible');
+            els.phaseWriting.classList.remove('visible');
+            
+            const parts = prevData.card.sentence.sentence.split('___');
+            els.readingSentence.innerHTML = parts[0] + `<strong style="color:var(--accent-purple-light)">${prevData.card.sentence.answer}</strong>` + (parts[1] || '');
+            els.readingTurkish.textContent = prevData.card.sentence.turkish;
+            els.readingHint.textContent = prevData.card.sentence.hint;
+            
+            els.retryIndicator.style.display = 'none';
+            els.phaseReading.style.display = 'block';
+            els.btnReadingNext.focus();
+        } else {
+            currentCardMode = 'recall';
+            showResultPhase(prevData.result || {
+                word: prevData.card.word,
+                isCorrect: false,
+                correctAnswer: prevData.card.sentence.answer,
+                fullSentence: prevData.card.sentence.sentence,
+                turkishTranslation: prevData.card.sentence.turkish
+            }, true);
+        }
     });
 
     els.btnQuitSession.addEventListener('click', () => {
@@ -903,6 +1012,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSession = new SessionManager(filteredMap, 1);
         }
         
+        resetGamification();
+        
         // UI Reset
         els.practiceSetup.style.display = 'none';
         els.practiceComplete.style.display = 'none';
@@ -937,7 +1048,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     function loadNextCard() {
         if (!currentSession) return;
         
-        const card = currentSession.getNextCard();
+        let card;
+        if (isReviewingHistory) {
+            isReviewingHistory = false;
+        }
+        
+        card = currentSession.getNextCard();
         
         if (!card) {
             // Session Complete
@@ -951,6 +1067,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (practiceMode === 'mixed') {
             currentCardMode = Math.random() > 0.5 ? 'recall' : 'reading';
         }
+        
+        if (!isReviewingHistory) {
+            goBackHistory.push({ card, mode: currentCardMode, result: null });
+            if (goBackHistory.length > 20) goBackHistory.shift();
+        }
+        
+        els.btnGoBack.style.display = goBackHistory.length > 1 ? 'inline-flex' : 'none';
+        cardStartTime = Date.now();
 
         if (currentCardMode === 'reading') {
             els.phaseQuestion.style.display = 'none';
@@ -1014,6 +1138,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const result = currentSession.handleAnswer(true);
         updateProgressUI();
         
+        const isQuick = (Date.now() - cardStartTime) < 4000;
+        let xpGained = baseCardXP;
+        if (isQuick) xpGained = Math.floor(baseCardXP * 1.5);
+        showXP(xpGained, isQuick);
+        updateStreak(true);
+        
+        if (goBackHistory.length > 0) goBackHistory[goBackHistory.length - 1].result = result;
+        
         els.fcInput.disabled = true;
         els.fcInput.classList.add('correct');
         els.fcInput.value = result.correctAnswer;
@@ -1058,6 +1190,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isCorrect = currentSession.checkAnswer(inputStr);
         const result = currentSession.handleAnswer(isCorrect);
         
+        const isQuick = (Date.now() - cardStartTime) < 4000;
+        let xpGained = baseCardXP;
+        if (isCorrect) {
+            if (isQuick) xpGained = Math.floor(baseCardXP * 1.5);
+            showXP(xpGained, isQuick);
+        }
+        updateStreak(isCorrect);
+        
+        if (goBackHistory.length > 0) goBackHistory[goBackHistory.length - 1].result = result;
+        
         updateProgressUI();
 
         // Visual Feedback on Input
@@ -1077,7 +1219,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 500);
     }
 
-    function showResultPhase(result) {
+    function showResultPhase(result, isHistoryReview = false) {
         els.phaseQuestion.style.display = 'none';
         
         els.resIcon.textContent = result.isCorrect ? '✅' : '❌';
@@ -1093,17 +1235,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         els.phaseResult.classList.add('visible');
 
-        if (result.isCorrect) {
-            els.phaseWriting.classList.add('visible');
-            els.writingInput.value = '';
-            els.writingInput.focus();
-            
-            // Allow skipping writing by pressing Enter
-            els.writingInput.onkeypress = (e) => {
-                if (e.key === 'Enter') els.btnNext.click();
-            };
-        } else {
+        if (isHistoryReview) {
+            els.phaseWriting.classList.remove('visible');
+            els.btnNext.innerHTML = 'Kaldığım Yerden Devam Et <i class="fa-solid fa-chevron-right"></i>';
             els.btnNext.focus();
+        } else {
+            els.btnNext.innerHTML = 'Sıradaki <i class="fa-solid fa-chevron-right"></i>';
+            if (result.isCorrect) {
+                els.phaseWriting.classList.add('visible');
+                els.writingInput.value = '';
+                els.writingInput.focus();
+                
+                // Allow skipping writing by pressing Enter
+                els.writingInput.onkeypress = (e) => {
+                    if (e.key === 'Enter') els.btnNext.click();
+                };
+            } else {
+                els.btnNext.focus();
+            }
         }
     }
 

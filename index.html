@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" href="icon.png">
     <!-- Icons: FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="css/style.css?v=8">
+    <link rel="stylesheet" href="css/style.css?v=9">
 </head>
 <body>
 
@@ -199,9 +199,20 @@
 
                 <!-- B: Active Session (Flashcard) -->
                 <div id="practice-active" class="practice-container" style="display: none;">
-                    <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 12px; align-items: center;">
+                        <div style="display: flex; gap: 12px; align-items: center;">
+                            <button class="btn btn-ghost btn-sm" id="btn-go-back" style="color: var(--text-secondary); display: none;">
+                                <i class="fa-solid fa-arrow-left"></i> <span class="hide-mobile">Geri</span>
+                            </button>
+                            <div class="score-display" id="game-score-display" style="font-weight: bold; color: var(--accent-purple); font-size: 1.1rem; visibility: hidden;">
+                                <i class="fa-solid fa-star"></i> <span id="game-score">0</span> XP
+                            </div>
+                            <div class="streak-display" id="game-streak" style="display: none; color: #f97316; font-weight: bold; font-size: 1.1rem; animation: pulse 1s infinite alternate;">
+                                <i class="fa-solid fa-fire"></i> <span class="hide-mobile">Seri</span> x<span id="streak-count">3</span>
+                            </div>
+                        </div>
                         <button class="btn btn-ghost btn-sm" id="btn-quit-session" style="color: var(--error);">
-                            <i class="fa-solid fa-right-from-bracket"></i> Pratiği Bitir
+                            <i class="fa-solid fa-right-from-bracket"></i> <span class="hide-mobile">Bitir</span>
                         </button>
                     </div>
                     <div class="progress-bar-container">
@@ -253,6 +264,10 @@
                             <div class="flashcard-hint" id="fc-hint">
                                 <span class="hint-turkish" id="hint-tr">anlamı</span>
                                 <span class="hint-letter" id="hint-letter">İlk Harf: A</span>
+                            </div>
+                            
+                            <div id="xp-fly-animation" style="position: absolute; top: 10px; right: 20px; color: var(--success); font-weight: 900; font-size: 1.5rem; opacity: 0; pointer-events: none; transition: all 0.5s ease-out; transform: translateY(0);">
+                                +10 XP!
                             </div>
                         </div>
 
@@ -562,10 +577,10 @@
     <div class="toast-container" id="toast-container"></div>
 
     <!-- Scripts -->
-    <script src="js/db.js?v=8"></script>
-    <script src="js/sync.js?v=8"></script>
-    <script src="js/gemini.js?v=8"></script>
-    <script src="js/session.js?v=8"></script>
-    <script src="js/app.js?v=8"></script>
+    <script src="js/db.js?v=9"></script>
+    <script src="js/sync.js?v=9"></script>
+    <script src="js/gemini.js?v=9"></script>
+    <script src="js/session.js?v=9"></script>
+    <script src="js/app.js?v=9"></script>
 </body>
 </html>
