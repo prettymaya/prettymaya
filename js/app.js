@@ -1082,10 +1082,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const prog = currentSession.getProgress();
         let displayCurrent = 1;
         
-        if (practiceMode === 'reading') {
-            displayCurrent = prog.stats.correct; // in reading, correct maps to position
+        if (practiceMode === 'reading' || practiceMode === 'warmup') {
+            displayCurrent = prog.stats.correct || 1; 
         } else {
-            displayCurrent = (currentSession.stats.total - currentSession.mainQueue.length - currentSession.retryInserts.length) + 1;
+            const retries = currentSession.retryInserts ? currentSession.retryInserts.length : 0;
+            displayCurrent = (currentSession.stats.total - currentSession.mainQueue.length - retries) + 1;
         }
         
         els.progCurrent.textContent = displayCurrent;
