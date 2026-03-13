@@ -1260,6 +1260,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const changed = currentSession.skipToDifferentSentence();
         if (changed) {
             showToast('Farklı bir cümle getirildi 🎉', 'info');
+            currentSession.mainQueue.unshift(currentSession.currentCard);
+            if (!isReviewingHistory && goBackHistory.length > 0) {
+                goBackHistory.pop();
+            }
             loadNextCard(); // re-render with the newly picked sentence
         } else {
             showToast('Bu kelime için sırada başka cümle yok.', 'warning');
