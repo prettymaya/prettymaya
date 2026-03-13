@@ -102,12 +102,9 @@ const SyncService = {
         // GitHub Gists API truncates bodies larger than 1MB.
         // For databases > 1MB, we must fetch the raw_url directly.
         if (file.truncated && file.raw_url) {
-            const rawResponse = await fetch(file.raw_url, {
-                headers: {
-                    'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            });
+            // Do NOT send the Authorization header here. `gist.githubusercontent.com` rejects preflight CORS
+            // requests if custom headers are included. The raw_url already contains an authenticated hash.
+            const rawResponse = await fetch(file.raw_url);
             if (!rawResponse.ok) {
                 throw new Error('Büyük veritabanı (raw) indirilemedi.');
             }
