@@ -550,6 +550,16 @@ textarea:focus {
         overflow-wrap: break-word !important;
     }
 
+    .flashcard-actions {
+        gap: 8px;
+    }
+
+    .flashcard-actions .btn {
+        flex: 1 1 45%; 
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+
     .flashcard-sentence {
         font-size: 1rem !important;
         padding: 0 2px;
@@ -779,6 +789,7 @@ textarea {
 
 .flashcard-actions {
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
     gap: 12px;
 }
