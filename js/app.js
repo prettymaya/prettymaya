@@ -1382,7 +1382,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (confirm('Bu cümleyi tamamen silmek istediğinize emin misiniz?')) {
             try {
-                await DB.deleteSentence(sentenceId);
+                await DB.deleteSentenceById(sentenceId);
                 showToast('Hatalı cümle kalıcı olarak silindi. 🗑️', 'success');
                 // Decrement session position because we basically skipped this card entirely
                 if (currentSession.position > 0) currentSession.position--;
