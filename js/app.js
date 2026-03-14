@@ -321,11 +321,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const minCount = els.selectMinSentences.value;
         const ghToken = els.inputGithubToken.value.trim();
         const gistId = els.inputGistId.value.trim();
+        const enableWriting = els.checkEnableSentenceCreation.checked;
         
         await DB.saveSetting('gemini_api_key', key);
         await DB.saveSetting('min_sentences', minCount);
         await DB.saveSetting('github_token', ghToken);
         await DB.saveSetting('github_gist_id', gistId);
+        await DB.saveSetting('enable_sentence_creation', enableWriting ? 'true' : 'false');
 
         minSentencesRequired = parseInt(minCount);
         
