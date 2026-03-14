@@ -1005,6 +1005,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Get previous card (leave it in history)
         const prevData = goBackHistory[goBackHistory.length - 1];
         
+        // Sync internal pointer so inline actions target the correct historical card
+        if (currentSession) {
+            currentSession.currentCard = prevData.card;
+        }
+
         isReviewingHistory = true;
         els.btnGoBack.style.display = goBackHistory.length > 1 ? 'inline-flex' : 'none';
         
@@ -1043,6 +1048,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.readingSentence.innerHTML = parts[0] + `<strong style="color:var(--accent-purple-light)">${prevData.card.sentence.answer}</strong>` + (parts[1] || '');
             els.readingTurkish.textContent = prevData.card.sentence.turkish;
             els.readingHint.textContent = prevData.card.sentence.hint;
+            
+            // Populate Comparison inline badge
+            els.readingCompareOriginal.textContent = prevData.card.word;
+            els.readingCompareAnswer.textContent = prevData.card.sentence.answer;
             
             els.retryIndicator.style.display = 'none';
             els.phaseReading.style.display = 'block';
@@ -1471,7 +1480,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await DB.deleteSentenceById(sentenceId);
                 
                 // 2. Remove from session memory
-                if (currentSession.wordSentences.has(cardWord)) {
+                if (currentSession.wordSentences && currentSession.wordSentences.has(cardWord)) {
                     let sents = currentSession.wordSentences.get(cardWord);
                     sents = sents.filter(s => s.id !== sentenceId);
                     currentSession.wordSentences.set(cardWord, sents);
@@ -1494,6 +1503,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         // Card is totally consumed, decrement total session words to avoid hanging progress bar
                         currentSession.stats.total = Math.max(1, currentSession.stats.total - 1);
                     }
+                } else if (!currentSession.wordSentences) {
+                    // This is a ReadingSessionManager or WarmUpSessionManager
+                    // Decrease total session stats since we deleted it entirely
+                    currentSession.stats.total = Math.max(1, currentSession.stats.total - 1);
                 }
 
                 // 3. Re-adjust position since we didn't "answer" it properly
