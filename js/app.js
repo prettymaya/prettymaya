@@ -1190,6 +1190,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.readingTurkish.textContent = card.sentence.turkish;
             els.readingHint.textContent = card.sentence.hint;
             
+            // Populate Comparison inline badge
+            els.readingCompareOriginal.textContent = card.word;
+            els.readingCompareAnswer.textContent = card.sentence.answer;
+            
             els.retryIndicator.style.display = 'none';
             els.phaseReading.style.display = 'block';
             els.btnReadingNext.focus();
