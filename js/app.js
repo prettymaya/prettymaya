@@ -733,8 +733,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.genCurrentWord.textContent = data.word;
             
             try {
-                // Pass meanings to Gemini for translation & fallback generation
-                const finalSentences = await GeminiService.processDictionaryMeanings(data.word, data.meanings, generateCount);
+                // Dynamic generation count logic: if more than 5 meanings, generate 2 to save time/tokens.
+                let actualCount = generateCount;
+                if (data.meanings.length > 5) {
+                    actualCount = Math.min(2, generateCount === 1 ? 1 : 2); // if user asked for 1, keep 1, otherwise max 2
+                } else if (generateCount > 1) {
+                    actualCount = 3; // Enforce 3 sentences for <= 5 meanings if we're not doing a 1-sentence bulk run
+                }
+
+                // Pass meanings to Gemini for pure AI generation
+                const finalSentences = await GeminiService.processDictionaryMeanings(data.word, data.meanings, actualCount);
                 
                 // Save fully processed sentences to DB
                 await DB.addSentences(data.word.toLowerCase(), finalSentences);
@@ -924,7 +932,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnCancelGen.textContent = 'İptal Et';
 
         try {
-            const generatedArr = await GeminiService.processDictionaryMeanings(word, forcedPayload, count);
+            let actualCount = count;
+            if (meanings.length > 5) {
+                actualCount = Math.min(2, count === 1 ? 1 : 2);
+            }
+
+            const generatedArr = await GeminiService.processDictionaryMeanings(word, forcedPayload, actualCount);
             await DB.addSentences(word, generatedArr);
             showToast(`${word} için toplam ${generatedArr.length} yeni AI cümlesi eklendi!`, 'success');
         } catch (e) {
