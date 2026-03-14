@@ -121,8 +121,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         resWord: document.getElementById('res-word'),
         resEnglish: document.getElementById('res-english'),
         resTurkish: document.getElementById('res-turkish'),
+        resCompareOriginal: document.getElementById('res-compare-original'),
+        resCompareAnswer: document.getElementById('res-compare-answer'),
+        btnInlineDeleteResult: document.getElementById('btn-inline-delete-result'),
         writingInput: document.getElementById('writing-input'),
         btnNext: document.getElementById('btn-next'),
+
+        // Reading Compare
+        readingCompareOriginal: document.getElementById('reading-compare-original'),
+        readingCompareAnswer: document.getElementById('reading-compare-answer'),
+        btnInlineDeleteReading: document.getElementById('btn-inline-delete-reading'),
 
         // Gamification & History
         btnGoBack: document.getElementById('btn-go-back'),
@@ -1331,6 +1339,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.resEnglish.innerHTML = highlightedSent;
 
         els.resTurkish.textContent = result.turkishTranslation;
+        
+        // Populate Comparison
+        els.resCompareOriginal.textContent = result.word;
+        els.resCompareAnswer.textContent = result.correctAnswer;
 
         els.phaseResult.classList.add('visible');
 
@@ -1359,6 +1371,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     els.btnNext.addEventListener('click', () => {
         loadNextCard();
     });
+
+    async function handleInlineDelete() {
+        if (!currentSession || !currentSession.currentCard || !currentSession.currentCard.sentence) return;
+        const sentenceId = currentSession.currentCard.sentence.id;
+        
+        if (confirm('Bu cümleyi tamamen silmek istediğinize emin misiniz?')) {
+            try {
+                await DB.deleteSentence(sentenceId);
+                showToast('Hatalı cümle kalıcı olarak silindi. 🗑️', 'success');
+                // Decrement session position because we basically skipped this card entirely
+                if (currentSession.position > 0) currentSession.position--;
+                // Load the exact same word again, but it will pick a different sentence next time it's drawn
+                currentSession.mainQueue.unshift(currentSession.currentCard);
+                loadNextCard(); 
+            } catch (e) {
+                showToast('Cümle silinirken hata oluştu.', 'error');
+            }
+        }
+    }
+
+    if (els.btnInlineDeleteResult) els.btnInlineDeleteResult.addEventListener('click', handleInlineDelete);
+    if (els.btnInlineDeleteReading) els.btnInlineDeleteReading.addEventListener('click', handleInlineDelete);
 
     async function finishSessionUI() {
         els.practiceActive.style.display = 'none';
