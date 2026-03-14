@@ -29,34 +29,33 @@ const GeminiService = {
     },
 
     buildPrompt(word, meaningsToProcess, generateCount) {
-        return `You are an expert English-Turkish translator and vocabulary curriculum designer.
+        return `You are an expert English-Turkish vocabulary curriculum designer.
         
-Task: You will receive a JSON list of definitions and examples for the English word/phrase "${word}" from a dictionary API.
-Your job is to translate the examples into natural, fluent Turkish, provide a short Turkish 'hint' for the definition, and generate additional sentences.
+Task: You are given a JSON list of dictionary definitions (meanings) for the target word/phrase: "${word}".
+Your job is to generate exactly ${generateCount} natural, medium-difficulty (B1-B2 level) example sentences for EACH provided meaning.
 
 STRICT INSTRUCTIONS:
-1. For each meaning provided, read the "example" sentence.
-2. If the "example" is NOT null:
-   - First, provide a natural Turkish translation of that EXACT sentence (set source to "dictionary").
-   - Replace the target word/phrase with "___" and put it in \`answer\`.
-   - THEN, generate ${Math.max(0, generateCount - 1)} MORE natural, B1-B2 level English fill-in-the-blank sentences demonstrating this same definition (set source to "ai").
-3. If the "example" IS null:
-   - YOU MUST generate exactly ${generateCount} natural, B1-B2 level English fill-in-the-blank sentences that perfectly demonstrate that specific definition (set source to "ai").
-4. For all sentences belonging to the same meaning, use the SAME \`hint\` which is a 1-3 word Turkish translation of the dictionary definition.
-5. Identify each sentence with its corresponding \`meaningIndex\` (from 0 to ${meaningsToProcess.length - 1}) based on the input array.
+1. Generate natural, conversational English sentences that clearly demonstrate the specific meaning. 
+   - Difficulty: Medium (B1-B2 level). Not overly simple ("He is a fella"), but not archaic or excessively formal. Example tone: "I ticked three things off the list in my head, and had only four chores left to do."
+2. YOU MUST strictly use the exact target word ("${word}") or a direct grammatical inflection (e.g., plurals, past tense). DO NOT use synonyms like "colleague" for "fella".
+3. Replace the occurrence of the target word/phrase in your generated sentence with "___".
+4. Put the exact word you removed into the \`answer\` field. Ensure phrasal verbs are completely removed if they are the target.
+5. Provide a natural Turkish translation of your sentence in the \`turkish\` field.
+6. Provide a \`hint\` which is a 1-3 word Turkish translation of the specific dictionary definition. Use the exact same hint for all sentences sharing a meaning.
+7. Identify each sentence with its corresponding \`meaningIndex\` (from 0 to ${meaningsToProcess.length - 1}) based on the input array.
 
 Input Data:
 ${JSON.stringify(meaningsToProcess, null, 2)}
 
-Return ONLY a valid JSON array of objects in this EXACT format for EVERY sentence generated/translated:
+Return ONLY a valid JSON array of objects in this EXACT format for EVERY sentence generated:
 [
   {
     "meaningIndex": 0,
-    "sentence": "The original dictionary sentence with ___ blank, OR your generated sentence with ___.",
-    "answer": "the removed word",
+    "sentence": "Your generated B1-B2 English sentence with the ___ blank.",
+    "answer": "the removed target word",
     "turkish": "Turkish translation of the sentence",
-    "hint": "kısa hint",
-    "source": "dictionary" // or "ai"
+    "hint": "kısa ipucu",
+    "source": "ai"
   }
 ]
 

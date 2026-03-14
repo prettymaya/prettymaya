@@ -97,6 +97,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnChangeSentence: document.getElementById('btn-change-sentence'),
         checkAutoHint: document.getElementById('check-auto-hint'),
         fcHint: document.getElementById('fc-hint'),
+        fcMeaning: document.getElementById('fc-meaning'),
         hintTr: document.getElementById('hint-tr'),
         hintLetter: document.getElementById('hint-letter'),
         retryIndicator: document.getElementById('retry-indicator'),
@@ -832,7 +833,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     } else {
                         group.sentences.forEach(s => {
                             const tr = document.createElement('tr');
-                            const aiBadge = s.source === 'ai' ? `<span style="background: rgba(var(--accent-purple-rgb), 0.2); color: var(--accent-purple-light); font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--accent-purple-darker); margin-right: 8px;" title="Yapay Zeka tarafından üretildi."><i class="fa-solid fa-robot"></i> AI</span>` : '';
+                            const aiBadge = `<span style="background: rgba(var(--accent-purple-rgb), 0.2); color: var(--accent-purple-light); font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--accent-purple-darker); margin-right: 8px;" title="Yapay Zeka tarafından üretildi."><i class="fa-solid fa-robot"></i> AI</span>`;
                             
                             tr.innerHTML = `
                                 <td style="font-size: 0.9rem; padding-left: 20px;">
@@ -1520,10 +1521,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Render Card
         const parts = card.sentence.sentence.split('___');
-        const badge = card.sentence.source === 'dictionary' 
-            ? `<span style="background: rgba(var(--success-rgb), 0.2); color: var(--success); font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--success); vertical-align: middle; margin-right: 8px;" title="Sözlük Örneği"><i class="fa-solid fa-book"></i> Sözlük</span>`
-            : `<span style="background: rgba(var(--accent-purple-rgb), 0.2); color: var(--accent-purple-light); font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--accent-purple-darker); vertical-align: middle; margin-right: 8px;" title="Yapay Zeka"><i class="fa-solid fa-robot"></i> AI</span>`;
+        const badge = `<span style="background: rgba(var(--accent-purple-rgb), 0.2); color: var(--accent-purple-light); font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--accent-purple-darker); vertical-align: middle; margin-right: 8px;" title="Yapay Zeka"><i class="fa-solid fa-robot"></i> AI</span>`;
         els.fcSentence.innerHTML = badge + parts[0] + '<span class="blank">___</span>' + (parts[1] || '');
+
+        // Render Dictionary Meaning
+        els.fcMeaning.style.display = 'none';
+        els.fcMeaning.innerHTML = '';
+        if (card.sentence.meaningId) {
+            DB.getMeaningsForWord(card.word).then(meanings => {
+                const targetMeaning = meanings.find(m => m.id === card.sentence.meaningId);
+                if (targetMeaning) {
+                    els.fcMeaning.innerHTML = `
+                        <span style="border: 1px solid var(--accent-purple-light); color: var(--accent-purple-light); padding: 1px 4px; border-radius: 4px; font-size:0.65rem; margin-right: 4px; text-transform: uppercase;">
+                            ${targetMeaning.partOfSpeech}
+                        </span>
+                        <span>${targetMeaning.definition}</span>
+                    `;
+                    els.fcMeaning.style.display = 'block';
+                }
+            });
+        }
         
         els.fcInput.value = '';
         els.fcInput.className = 'flashcard-input'; // reset classes
