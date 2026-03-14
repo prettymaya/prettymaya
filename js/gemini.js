@@ -40,7 +40,8 @@ STRICT RULES:
 6. Replace the target word (or its grammatically modified form) with "___" (three underscores). 
    - CRITICAL DICTATE: If the target vocabulary is a MULTI-WORD expression, phrasal verb, or idiom (e.g., "carve out", "habit stacking", "put up with"), you MUST replace the ENTIRE expression as a single block of "___". Do NOT leave parts of the expression visible (e.g., replacing only "carve" and leaving "out"). The \`answer\` field MUST contain the full exact phrase you removed.
 7. The word may appear in different grammatical forms (e.g., "leave" → "left", "leaving", "leaves" OR "act" → "acting", "action", "active").
-8. Each sentence MUST use a DIFFERENT meaning, context, or grammatical role of the word.
+   - EXTREMELY IMPORTANT: The \`answer\` MUST ALWAYS be the exact word "${word}" or a direct grammatical derivation of it. NEVER use a synonym (like using "rid" when the target is "vice").
+8. Each sentence MUST provide a DIFFERENT context. You may reuse meanings if the word doesn't have enough distinct meanings to fulfill the count, but the contexts/sentences must be different.
 9. Turkish translations must be natural and fluent — not word-by-word translations. Capture the exact nuanced meaning the word has in that specific sentence.
 10. The "hint" field should contain the exact Turkish meaning of the word form used in that specific sentence (e.g. if used as a noun, give noun meaning; if verb, give verb meaning).
 

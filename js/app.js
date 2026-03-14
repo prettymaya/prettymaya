@@ -1395,6 +1395,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     
                     // If the word has no more sentences left, don't ask it again.
                     if (sents.length > 0) {
+                        // Assign a new sentence to this card BEFORE unshifting!
+                        const state = currentSession.wordState.get(currentSession.currentCard.cardKey);
+                        const unused = sents.filter(s => !state.usedSentenceIds.has(s.id));
+                        
+                        let newSent = unused.length > 0 
+                                      ? unused[Math.floor(Math.random() * unused.length)] 
+                                      : sents[Math.floor(Math.random() * sents.length)];
+                                      
+                        currentSession.currentCard.sentence = newSent;
+                        state.usedSentenceIds.add(newSent.id);
+
                         currentSession.mainQueue.unshift(currentSession.currentCard);
                     } else {
                         // Card is totally consumed, decrement total session words to avoid hanging progress bar
