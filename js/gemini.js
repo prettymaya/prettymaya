@@ -28,55 +28,48 @@ const GeminiService = {
         return true;
     },
 
-    buildPrompt(word, count = 10) {
-        return `You are an expert English teacher creating active-recall vocabulary exercises.
+    buildPrompt(word, meaningsToProcess) {
+        return `You are an expert English-Turkish translator and vocabulary curriculum designer.
+        
+Task: You will receive a JSON list of definitions and examples for the English word/phrase "${word}" from a dictionary API.
+Your job is to translate the examples into natural, fluent Turkish and provide a short Turkish 'hint' for the definition.
 
-Task: Generate exactly ${count} fill-in-the-blank sentences for the word "${word}".
+STRICT INSTRUCTIONS:
+1. For each meaning provided, read the "example" sentence.
+2. If the "example" is NOT null:
+   - Provide a natural Turkish translation of that EXACT sentence in the \`turkish\` field.
+   - Replace the occurrence of the target word/phrase in the English sentence with "___" and put the removed word/phrase in the \`answer\` field. Ensure phrasal verbs are completely removed.
+3. If the "example" IS null:
+   - YOU MUST generate exactly ONE natural, B1-B2 level English fill-in-the-blank sentence that perfectly demonstrates that specific definition.
+   - Replace the target word with "___". 
+   - Put the removed word in the \`answer\` field.
+   - Provide the \`turkish\` translation.
+   - Set the \`source\` field to "ai" (if you generated the sentence) or "dictionary" (if you used the provided example).
+4. For all meanings, provide a \`hint\` which is a 1-3 word Turkish translation of the specific dictionary definition.
 
-Rules:
-* Use the word in its most common grammatical forms and meanings (noun, verb, adjective, etc.). If both noun and verb exist, include both.
-* Sentences must sound natural and contain strong context clues.
-* Length: 8-16 words.
-* Difficulty: medium (daily conversation to light academic).
-* Replace the target word (or its form) with "___".
+Input Data:
+${JSON.stringify(meaningsToProcess, null, 2)}
 
-Phrasal verbs:
-If the word is a multi-word expression (e.g., "put up with", "carve out"):
-* Remove the entire phrase and replace it with ONE "___".
-* Do not leave any part of the phrase in the sentence.
-* The \`answer\` must contain the full phrase.
-
-Answer rules:
-* \`answer\` must be EXACTLY "${word}" or a direct grammatical form of it (e.g., leave -> leaving / acted).
-* Never use synonyms (e.g., if target is "vice", do not use "rid").
-
-Context:
-* Each sentence must use a different context.
-
-Turkish:
-* \`turkish\` must be a natural, non-robotic translation of the sentence.
-* \`hint\` must be the Turkish meaning of the word form used in that specific sentence.
-
-Return ONLY a valid JSON array with exactly ${count} objects.
-Example:
+Return ONLY a valid JSON array of objects in this EXACT format for each input meaning (keep the same array order):
 [
   {
-    "sentence": "She ___ the door open for the guests.",
-    "answer": "left",
-    "turkish": "Misafirler için kapıyı açık bıraktı.",
-    "hint": "bırakmak"
+    "sentence": "The exact dictionary sentence with ___ blank, OR your generated sentence with ___.",
+    "answer": "the removed word",
+    "turkish": "Turkish translation of the sentence",
+    "hint": "kısa hint",
+    "source": "dictionary" // or "ai" if you had to generate it
   }
 ]
 
-IMPORTANT: Return ONLY the JSON array.`;
+IMPORTANT: Return ONLY the JSON array. Do not include markdown formatting like \`\`\`json.`;
     },
 
-    async generateSentences(word, count = 10, onProgress = null) {
+    async processDictionaryMeanings(word, meanings, onProgress = null) {
         const apiKey = await this.getApiKey();
         if (!apiKey) throw new Error('API anahtarı bulunamadı');
 
         const url = `${this.BASE_URL}/${this.MODEL}:generateContent?key=${apiKey}`;
-        const prompt = this.buildPrompt(word, count);
+        const prompt = this.buildPrompt(word, meanings);
 
         const response = await fetch(url, {
             method: 'POST',
@@ -84,94 +77,41 @@ IMPORTANT: Return ONLY the JSON array.`;
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
                 generationConfig: {
-                    temperature: 0.9,
+                    temperature: 0.2, // Low temperature for precise translation
+                    topK: 40,
                     topP: 0.95,
-                    maxOutputTokens: 4096,
-                    responseMimeType: 'application/json'
+                    maxOutputTokens: 2048,
                 }
             })
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error?.message || 'Cümle üretme hatası');
+            const errorData = await response.json();
+            throw new Error(errorData.error?.message || 'Gemini API Hatası');
         }
 
         const data = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-        if (!text) throw new Error('API boş yanıt döndürdü');
-
+        const textResponse = data.candidates[0].content.parts[0].text;
+        
         try {
-            // Try parsing directly
-            const sentences = JSON.parse(text);
-
-            // Validate structure
-            if (!Array.isArray(sentences)) throw new Error('JSON array bekleniyor');
-
-            return sentences.map(s => ({
-                sentence: s.sentence || '',
-                answer: (s.answer || '').toLowerCase().trim(),
-                turkish: s.turkish || '',
-                hint: s.hint || ''
-            })).filter(s => s.sentence && s.answer);
-        } catch (parseError) {
-            // Try extracting JSON from markdown code blocks
-            const jsonMatch = text.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-                const sentences = JSON.parse(jsonMatch[0]);
-                return sentences.map(s => ({
-                    sentence: s.sentence || '',
-                    answer: (s.answer || '').toLowerCase().trim(),
-                    turkish: s.turkish || '',
-                    hint: s.hint || ''
-                })).filter(s => s.sentence && s.answer);
-            }
-            throw new Error('API yanıtı ayrıştırılamadı: ' + parseError.message);
+            const cleanJson = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+            const translatedArr = JSON.parse(cleanJson);
+            
+            // Merge the Gemini translations back with the meaning IDs
+            return meanings.map((m, index) => {
+                const translation = translatedArr[index];
+                return {
+                    meaningId: m.id, // This will be assigned after saving meanings to DB
+                    sentence: translation.sentence,
+                    answer: translation.answer,
+                    turkish: translation.turkish,
+                    hint: translation.hint,
+                    source: translation.source || 'dictionary'
+                };
+            });
+        } catch (e) {
+            console.error("Gemini JSON Parsing Error:", textResponse);
+            throw new Error("Gemini geçerli bir JSON formatı döndürmedi.");
         }
-    },
-
-    async generateForMissingWords(words, minCount = 10, onProgress = null) {
-        const results = { success: [], failed: [] };
-        let processed = 0;
-
-        for (const word of words) {
-            try {
-                const existingCount = await DB.getSentenceCountForWord(word);
-
-                if (existingCount >= minCount) {
-                    processed++;
-                    if (onProgress) onProgress(processed, words.length, word, 'skipped');
-                    continue;
-                }
-
-                const needed = minCount - existingCount;
-                const sentences = await this.generateSentences(word, needed);
-
-                await DB.addSentences(word, sentences);
-                results.success.push({ word, generated: sentences.length });
-
-                processed++;
-                if (onProgress) onProgress(processed, words.length, word, 'success');
-
-                // Rate limiting: short delay between requests
-                await new Promise(r => setTimeout(r, 500));
-            } catch (error) {
-                results.failed.push({ word, error: error.message });
-                processed++;
-                if (onProgress) onProgress(processed, words.length, word, 'error');
-
-                // Longer delay on error (might be rate limited)
-                await new Promise(r => setTimeout(r, 2000));
-            }
-        }
-
-        return results;
-    },
-
-    async addMoreSentences(word, additionalCount = 5) {
-        const sentences = await this.generateSentences(word, additionalCount);
-        await DB.addSentences(word, sentences);
-        return sentences.length;
     }
 };

@@ -607,30 +607,101 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnConfirmAdd.disabled = true;
         els.btnConfirmAdd.innerHTML = '<span class="spinner" style="width:16px;height:16px;"></span> Ekleniyor...';
 
-        const result = await DB.addWords(list);
-        await updateDashboard();
-        
-        els.btnConfirmAdd.disabled = false;
-        els.btnConfirmAdd.innerHTML = 'Kelimeleri Ekle';
-        els.modalAddWords.classList.remove('visible');
+        try {
+            // Stage 1: Fast Dictionary Lookup & Word Addition
+            const parsedWordsData = [];
+            const results = { added: [], existing: [], failed: [] };
 
-        showToast(`${result.added.length} kelime eklendi, ${result.existing.length} kelime zaten vardı.`, 'success');
-        
-        renderWordList();
+            for (const dictWord of list) {
+                try {
+                    // Check if already exists fast
+                    const existingCheck = await DB.getSentencesForWord(dictWord.toLowerCase());
+                    if (existingCheck.length > 0) {
+                        results.existing.push(dictWord);
+                        continue;
+                    }
 
-        if (els.checkAutoGen.checked && result.added.length > 0) {
-            startGenerationProcess(result.added);
+                    // Fetch from Dictionary API
+                    const dictData = await DictionaryService.fetchWord(dictWord);
+                    parsedWordsData.push(dictData);
+                } catch (e) {
+                    console.error("Dictionary Fetch Error:", e);
+                    results.failed.push(dictWord);
+                }
+            }
+
+            // Add Words with Audio data
+            const dbWordObjects = parsedWordsData.map(d => ({ word: d.word, audio: d.audio }));
+            const addResult = await DB.addWords(dbWordObjects);
+            results.added = addResult.added;
+
+            // Save basic meanings instantly
+            for (const d of parsedWordsData) {
+                if (results.added.includes(d.word.toLowerCase())) {
+                    const addedMeaningIds = await DB.addMeanings(d.word.toLowerCase(), d.meanings);
+                    // Attach the new DB IDs back to the meaning objects for the Gemini stage
+                    d.meanings.forEach((m, index) => m.id = addedMeaningIds[index]);
+                }
+            }
+            
+            els.modalAddWords.classList.remove('visible');
+            
+            let message = `${results.added.length} kelime sözlükten çekildi.`;
+            if (results.existing.length > 0) message += ` ${results.existing.length} zaten vardı.`;
+            if (results.failed.length > 0) message += ` ${results.failed.length} kelime bulunamadı.`;
+            showToast(message, results.failed.length > 0 ? 'info' : 'success');
+
+            // Stage 2: Automatic Background Translation (if checked)
+            if (els.checkAutoGen.checked && parsedWordsData.length > 0) {
+                // We only process words that actually got added newly
+                const novelWordsData = parsedWordsData.filter(d => results.added.includes(d.word.toLowerCase()));
+                if (novelWordsData.length > 0) {
+                    startDictionaryTranslationProcess(novelWordsData);
+                }
+            }
+
+            await updateDashboard();
+            renderWordList();
+            
+        } catch(e) {
+            showToast('Toplu ekleme hatası: ' + e.message, 'error');
+        } finally {
+            els.btnConfirmAdd.disabled = false;
+            els.btnConfirmAdd.innerHTML = 'Kelimeleri Ekle';
         }
     });
 
-    // ─── Sentence Generation ────────────────────────────────
-    els.btnGenMissing.addEventListener('click', () => {
-        const missing = allWords.filter(w => (sentenceCounts[w.word] || 0) < minSentencesRequired);
+    // ─── Dictionary & AI Pipeline ───────────────────────────
+    els.btnGenMissing.addEventListener('click', async () => {
+        // Redesigned to fetch full meanings if sentences are missing
+        const missing = allWords.filter(w => (sentenceCounts[w.word] || 0) < 1); // If 0 sentences
         if (missing.length === 0) {
-            showToast('Tüm kelimelerin cümlesi tam!', 'success');
+            showToast('Tüm kelimelerin cümlesi var!', 'success');
             return;
         }
-        startGenerationProcess(missing.map(w => w.word));
+
+        els.btnGenMissing.disabled = true;
+        els.btnGenMissing.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        
+        try {
+            const parsedWordsData = [];
+            for(const w of missing) {
+                try {
+                    const dictData = await DictionaryService.fetchWord(w.word);
+                    const addedMeaningIds = await DB.addMeanings(w.word, dictData.meanings);
+                    dictData.meanings.forEach((m, idx) => m.id = addedMeaningIds[idx]);
+                    parsedWordsData.push(dictData);
+                } catch(e) { console.error('Dictionary API error for ' + w.word, e); }
+            }
+            if(parsedWordsData.length > 0) {
+                startDictionaryTranslationProcess(parsedWordsData);
+            } else {
+                showToast("Sözlükten kelime çekilemedi.", "error");
+            }
+        } finally {
+            els.btnGenMissing.disabled = false;
+            els.btnGenMissing.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Eksik Cümleleri Üret';
+        }
     });
 
     els.btnCancelGen.addEventListener('click', () => {
@@ -638,67 +709,146 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnCancelGen.textContent = 'İptal Ediliyor...';
     });
 
-    async function startGenerationProcess(wordsToProcess) {
+    async function startDictionaryTranslationProcess(parsedWordsData) {
         const apiKey = await DB.getSetting('gemini_api_key');
         if (!apiKey) {
-            showToast('Cümle üretmek için Ayarlar\'dan API anahtarı girmelisiniz.', 'error');
+            showToast('Türkçe çeviri ve AI için Ayarlar\'dan API anahtarı girmelisiniz.', 'error');
             return;
         }
 
         cancelGeneration = false;
         els.overlayGen.classList.add('visible');
-        els.genTotalNum.textContent = wordsToProcess.length;
+        els.genTotalNum.textContent = parsedWordsData.length;
         els.genCurrentNum.textContent = 0;
         els.genProgressFill.style.width = '0%';
         els.btnCancelGen.textContent = 'İptal Et';
+        document.querySelector('.progress-status').textContent = "Türkçeye Çevriliyor...";
 
-        try {
-            await GeminiService.generateForMissingWords(wordsToProcess, minSentencesRequired, (processed, total, word, status) => {
-                let perc = Math.round((processed / total) * 100);
-                els.genCurrentNum.textContent = processed;
-                els.genProgressFill.style.width = `${perc}%`;
-                els.genCurrentWord.textContent = word;
+        let processed = 0;
+        for (const data of parsedWordsData) {
+            if (cancelGeneration) break;
 
-                if (cancelGeneration) throw new Error('CanceledByUser');
-            });
-            showToast('Cümle üretimi tamamlandı!', 'success');
-        } catch (e) {
-            if (e.message === 'CanceledByUser') {
-                showToast('Üretim iptal edildi.', 'info');
-            } else {
-                showToast(`Hata: ${e.message}`, 'error');
+            els.genCurrentWord.textContent = data.word;
+            
+            try {
+                // Pass meanings to Gemini for translation & fallback generation
+                const finalSentences = await GeminiService.processDictionaryMeanings(data.word, data.meanings);
+                
+                // Save fully processed sentences to DB
+                await DB.addSentences(data.word.toLowerCase(), finalSentences);
+                
+                showToast(`${data.word} tamamlandı.`, 'success');
+            } catch (e) {
+                console.error(`AI Error for ${data.word}:`, e);
+                showToast(`${data.word} çevrilemedi: ${e.message}`, 'error');
             }
-        } finally {
-            els.overlayGen.classList.remove('visible');
-            await updateDashboard();
-            renderWordList();
+
+            processed++;
+            let perc = Math.round((processed / parsedWordsData.length) * 100);
+            els.genCurrentNum.textContent = processed;
+            els.genProgressFill.style.width = `${perc}%`;
+            
+            // Brief pause
+            await new Promise(r => setTimeout(r, 600));
+        }
+
+        els.overlayGen.classList.remove('visible');
+        document.querySelector('.progress-status').textContent = "Cümleler Üretiliyor..."; // reset default
+        await updateDashboard();
+        renderWordList();
+        
+        if (cancelGeneration) {
+            showToast('İşlem iptal edildi.', 'info');
+        } else {
+            showToast('Tüm çeviriler tamamlandı!', 'success');
         }
     }
 
     // ─── Word Details ───────────────────────────────────────
     async function openWordDetails(word) {
         currentDetailWord = word;
-        els.detailWordTitle.textContent = word;
+        
+        // Fetch base word to check for audio
+        const allLocalWords = await DB.getAllWords();
+        const wordData = allLocalWords.find(w => w.word === word);
+        const hasAudio = wordData && wordData.audio;
+
+        els.detailWordTitle.innerHTML = `${word} ${hasAudio ? `<button class="btn btn-ghost btn-sm" onclick="new Audio('${wordData.audio}').play()" style="color:var(--accent-blue); margin-left:10px;"><i class="fa-solid fa-volume-high"></i></button>` : ''}`;
         
         const count = await DB.getSentenceCountForWord(word);
         els.detailSentenceCount.textContent = count;
         
+        // Fetch Meanings and Sentences
+        const meanings = await DB.getMeaningsForWord(word);
         const sentences = await DB.getSentencesForWord(word);
         els.detailSentencesList.innerHTML = '';
         
-        if (sentences.length === 0) {
-            els.detailSentencesList.innerHTML = `<tr><td colspan="3" style="text-align:center; color: var(--text-muted)">Cümle bulunamadı.</td></tr>`;
+        if (sentences.length === 0 && meanings.length === 0) {
+            els.detailSentencesList.innerHTML = `<tr><td colspan="3" style="text-align:center; color: var(--text-muted)">Cümle veya anlam bulunamadı.</td></tr>`;
         } else {
-            sentences.forEach(s => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td style="font-size: 0.9rem;">${s.sentence.replace('___', '<strong style="color:var(--accent-purple-light)">___</strong>')}</td>
-                    <td><strong>${s.answer}</strong></td>
-                    <td><button class="btn btn-ghost btn-sm btn-delete-single-sentence" data-id="${s.id}" style="color:var(--error);"><i class="fa-solid fa-trash"></i></button></td>
-                `;
-                els.detailSentencesList.appendChild(tr);
-            });
+            // Group sentences by meaningId
+            const grouped = {};
+            meanings.forEach(m => grouped[m.id] = { meaning: m, sentences: [] });
             
+            // Uncategorized sentences (fallback)
+            grouped['uncategorized'] = { meaning: { partOfSpeech: 'Genel', definition: 'Sözlük harici cümleler' }, sentences: [] };
+
+            sentences.forEach(s => {
+                if (s.meaningId && grouped[s.meaningId]) {
+                    grouped[s.meaningId].sentences.push(s);
+                } else {
+                    grouped['uncategorized'].sentences.push(s);
+                }
+            });
+
+            // Render Groups
+            for (const key in grouped) {
+                const group = grouped[key];
+                if (key !== 'uncategorized' || group.sentences.length > 0) {
+                    
+                    // Header Row for Meaning
+                    const headerTr = document.createElement('tr');
+                    headerTr.innerHTML = `
+                        <td colspan="3" style="background: rgba(255,255,255,0.03); padding-top: 15px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div style="color: var(--accent-purple-light); font-weight:600;">
+                                    <span style="border: 1px solid var(--accent-purple-light); padding: 2px 6px; border-radius: 4px; font-size:0.7rem; margin-right: 8px;">${group.meaning.partOfSpeech.toUpperCase()}</span>
+                                    ${group.meaning.definition}
+                                </div>
+                                <button class="btn btn-ghost btn-sm btn-generate-meaning-sentence" data-word="${word}" data-meaning-id="${key}" title="Bu anlama 3 cümle daha üret" style="color: var(--accent-blue);">
+                                    <i class="fa-solid fa-robot"></i> +3 Üret
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    els.detailSentencesList.appendChild(headerTr);
+
+                    // Sentences under this meaning
+                    if (group.sentences.length === 0) {
+                        const emptyTr = document.createElement('tr');
+                        emptyTr.innerHTML = `<td colspan="3" style="text-align:center; color: var(--text-muted); font-size:0.85rem; font-style:italic;">Bu anlama ait henüz örnek cümle yok.</td>`;
+                        els.detailSentencesList.appendChild(emptyTr);
+                    } else {
+                        group.sentences.forEach(s => {
+                            const tr = document.createElement('tr');
+                            const aiBadge = s.source === 'ai' ? `<span style="background: rgba(var(--accent-purple-rgb), 0.2); color: var(--accent-purple-light); font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--accent-purple-darker); margin-right: 8px;" title="Yapay Zeka tarafından üretildi."><i class="fa-solid fa-robot"></i> AI</span>` : '';
+                            
+                            tr.innerHTML = `
+                                <td style="font-size: 0.9rem; padding-left: 20px;">
+                                    ${aiBadge}
+                                    ${s.sentence.replace('___', '<strong style="color:var(--success)">___</strong>')}
+                                    <br><span style="font-size:0.75rem; color: var(--text-muted);"><i class="fa-solid fa-angle-right"></i> ${s.turkish}</span>
+                                </td>
+                                <td><strong>${s.answer}</strong></td>
+                                <td><button class="btn btn-ghost btn-sm btn-delete-single-sentence" data-id="${s.id}" style="color:var(--error);"><i class="fa-solid fa-trash"></i></button></td>
+                            `;
+                            els.detailSentencesList.appendChild(tr);
+                        });
+                    }
+                }
+            }
+            
+            // Attach event listeners for delete
             document.querySelectorAll('.btn-delete-single-sentence').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const id = e.currentTarget.dataset.id;
@@ -709,6 +859,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                         await updateDashboard();
                         renderWordList();
                     }
+                });
+            });
+
+            // Attach event listeners for specific meaning generation
+            document.querySelectorAll('.btn-generate-meaning-sentence').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const w = e.currentTarget.dataset.word;
+                    const mId = e.currentTarget.dataset.meaningId;
+                    if(mId === 'uncategorized') {
+                        showToast("Bu kategori için üretim yapılamaz.", "error"); return;
+                    }
+                    generateSentencesForSpecificMeaning(w, Number(mId), 3);
                 });
             });
         }
@@ -728,34 +890,56 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     els.btnGenerate5Sentences.addEventListener('click', () => {
-        if (!currentDetailWord) return;
-        generate5SentencesForWord(currentDetailWord, true);
+        // Global "Generate 5" is deprecated. Using definition-specific generation now.
+        showToast("Lütfen kelimenin ait olduğu anlam başlığının yanındaki '+3 Üret' butonunu kullanın.", "info");
     });
 
-    async function generate5SentencesForWord(word, isFromModal = false) {
+    async function generateSentencesForSpecificMeaning(word, meaningId, count = 3) {
         const apiKey = await DB.getSetting('gemini_api_key');
         if (!apiKey) {
             showToast('Lütfen önce Ayarlar\'dan API anahtarı girin.', 'error');
             return;
         }
 
-        if (isFromModal) {
-            els.modalWordDetails.classList.remove('visible');
+        const meanings = await DB.getMeaningsForWord(word);
+        const targetMeaning = meanings.find(m => m.id === meaningId);
+        if(!targetMeaning) {
+            showToast("Anlam bulunamadı.", "error"); return;
         }
+
+        // Send a custom forced payload to Gemini telling it to fake "missing example" to enforce generation
+        const forcedPayload = [{
+            id: targetMeaning.id,
+            partOfSpeech: targetMeaning.partOfSpeech,
+            definition: targetMeaning.definition,
+            example: null // Force generation
+        }];
+
+        els.modalWordDetails.classList.remove('visible');
         
         cancelGeneration = false;
         els.overlayGen.classList.add('visible');
-        els.genTotalNum.textContent = 1;
+        els.genTotalNum.textContent = count;
         els.genCurrentNum.textContent = 0;
         els.genProgressFill.style.width = '0%';
-        els.genCurrentWord.textContent = word;
+        els.genCurrentWord.textContent = `${word} (${targetMeaning.partOfSpeech})`;
         els.btnCancelGen.textContent = 'İptal Et';
 
         try {
-            const added = await GeminiService.addMoreSentences(word, 5);
-            els.genCurrentNum.textContent = 1;
-            els.genProgressFill.style.width = '100%';
-            showToast(`${word} için ${added} yeni cümle eklendi!`, 'success');
+            let totalGenerated = 0;
+            for(let i=0; i<count; i++) {
+                if(cancelGeneration) break;
+                
+                const generatedArr = await GeminiService.processDictionaryMeanings(word, forcedPayload);
+                await DB.addSentences(word, generatedArr);
+                
+                totalGenerated++;
+                els.genCurrentNum.textContent = totalGenerated;
+                els.genProgressFill.style.width = `${Math.round((totalGenerated/count)*100)}%`;
+                await new Promise(r => setTimeout(r, 600)); // Rate limit
+            }
+            
+            showToast(`${word} için ${totalGenerated} yeni AI cümlesi eklendi!`, 'success');
         } catch (e) {
             showToast(`Hata: ${e.message}`, 'error');
         } finally {

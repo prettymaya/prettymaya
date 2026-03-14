@@ -2,7 +2,7 @@
 const DB = {
     db: null,
     DB_NAME: 'prettymaya',
-    DB_VERSION: 1,
+    DB_VERSION: 3,
 
     async init() {
         return new Promise((resolve, reject) => {
@@ -17,16 +17,23 @@ const DB = {
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
 
-                // Words store
+                // Words store (added audio field)
                 if (!db.objectStoreNames.contains('words')) {
                     const wordStore = db.createObjectStore('words', { keyPath: 'word' });
                     wordStore.createIndex('addedDate', 'addedDate', { unique: false });
                 }
 
-                // Sentences store
+                // Meanings store (New in v3) - Holds definitions from Dictionary API
+                if (!db.objectStoreNames.contains('meanings')) {
+                    const meaningStore = db.createObjectStore('meanings', { keyPath: 'id', autoIncrement: true });
+                    meaningStore.createIndex('word', 'word', { unique: false });
+                }
+
+                // Sentences store (Updated in v3 to include meaningId and source)
                 if (!db.objectStoreNames.contains('sentences')) {
                     const sentenceStore = db.createObjectStore('sentences', { keyPath: 'id', autoIncrement: true });
                     sentenceStore.createIndex('word', 'word', { unique: false });
+                    sentenceStore.createIndex('meaningId', 'meaningId', { unique: false });
                 }
 
                 // Settings store
@@ -50,32 +57,36 @@ const DB = {
         const added = [];
         const existing = [];
 
-        for (const word of wordList) {
-            const clean = word.trim().toLowerCase();
-            if (!clean) continue;
+        for (const wordObj of wordList) {
+            // Support both old array of strings and new array of objects {word, audio}
+            const cleanWord = typeof wordObj === 'string' ? wordObj.trim().toLowerCase() : wordObj.word.trim().toLowerCase();
+            const audioUrl = typeof wordObj === 'object' ? wordObj.audio : null;
+
+            if (!cleanWord) continue;
 
             try {
                 const check = await new Promise((resolve, reject) => {
-                    const req = store.get(clean);
+                    const req = store.get(cleanWord);
                     req.onsuccess = () => resolve(req.result);
                     req.onerror = () => reject(req.error);
                 });
 
                 if (check) {
-                    existing.push(clean);
+                    existing.push(cleanWord);
                 } else {
                     await new Promise((resolve, reject) => {
                         const req = store.add({
-                            word: clean,
+                            word: cleanWord,
+                            audio: audioUrl,
                             addedDate: new Date().toISOString()
                         });
                         req.onsuccess = () => resolve();
                         req.onerror = () => reject(req.error);
                     });
-                    added.push(clean);
+                    added.push(cleanWord);
                 }
             } catch (e) {
-                console.error(`Error adding word "${clean}":`, e);
+                console.error(`Error adding word "${cleanWord}":`, e);
             }
         }
 
@@ -93,31 +104,44 @@ const DB = {
     },
 
     async deleteWord(word) {
-        const tx = this.db.transaction(['words', 'sentences'], 'readwrite');
+        const tx = this.db.transaction(['words', 'sentences', 'meanings'], 'readwrite');
         tx.objectStore('words').delete(word);
 
         // Delete associated sentences
         const sentenceStore = tx.objectStore('sentences');
-        const index = sentenceStore.index('word');
-        const req = index.openCursor(IDBKeyRange.only(word));
+        const sIndex = sentenceStore.index('word');
+        const sReq = sIndex.openCursor(IDBKeyRange.only(word));
+        sReq.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (cursor) {
+                cursor.delete();
+                cursor.continue();
+            }
+        };
+
+        // Delete associated meanings
+        const meaningStore = tx.objectStore('meanings');
+        const mIndex = meaningStore.index('word');
+        const mReq = mIndex.openCursor(IDBKeyRange.only(word));
+        mReq.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (cursor) {
+                cursor.delete();
+                cursor.continue();
+            }
+        };
 
         return new Promise((resolve, reject) => {
-            req.onsuccess = (event) => {
-                const cursor = event.target.result;
-                if (cursor) {
-                    cursor.delete();
-                    cursor.continue();
-                }
-            };
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
         });
     },
 
     async deleteAllWords() {
-        const tx = this.db.transaction(['words', 'sentences'], 'readwrite');
+        const tx = this.db.transaction(['words', 'sentences', 'meanings'], 'readwrite');
         tx.objectStore('words').clear();
         tx.objectStore('sentences').clear();
+        tx.objectStore('meanings').clear();
         return new Promise((resolve, reject) => {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
@@ -164,10 +188,12 @@ const DB = {
             await new Promise((resolve, reject) => {
                 const req = store.add({
                     word: word,
+                    meaningId: s.meaningId || null,
                     sentence: s.sentence,
                     answer: s.answer,
                     turkish: s.turkish,
-                    hint: s.hint
+                    hint: s.hint,
+                    source: s.source || 'dictionary' // 'dictionary' or 'ai'
                 });
                 req.onsuccess = () => resolve();
                 req.onerror = () => reject(req.error);
@@ -200,6 +226,38 @@ const DB = {
             const store = tx.objectStore('sentences');
             const req = store.delete(Number(id));
             req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    // ─── Meanings (Dictionary Definitions) ───────────────────
+    async addMeanings(word, meanings) {
+        const tx = this.db.transaction('meanings', 'readwrite');
+        const store = tx.objectStore('meanings');
+        const addedIds = [];
+
+        for (const m of meanings) {
+            const id = await new Promise((resolve, reject) => {
+                const req = store.add({
+                    word: word,
+                    partOfSpeech: m.partOfSpeech,
+                    definition: m.definition
+                });
+                req.onsuccess = (e) => resolve(e.target.result);
+                req.onerror = () => reject(req.error);
+            });
+            addedIds.push(id);
+        }
+        return addedIds;
+    },
+
+    async getMeaningsForWord(word) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('meanings', 'readonly');
+            const store = tx.objectStore('meanings');
+            const index = store.index('word');
+            const req = index.getAll(IDBKeyRange.only(word));
+            req.onsuccess = () => resolve(req.result);
             req.onerror = () => reject(req.error);
         });
     },
