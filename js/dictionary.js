@@ -4,22 +4,23 @@ const DictionaryService = {
 
     async fetchWord(word) {
         try {
-            const response = await fetch(`${this.BASE_URL}/${encodeURIComponent(word)}`);
-            if (!response.ok) {
-                if (response.status === 404) {
-                    throw new Error(`Sözlükte "${word}" kelimesi bulunamadı.`);
-                }
-                throw new Error('Sözlük API bağlantı hatası.');
-            }
-            
-            const data = await response.json();
-            return this.parseResponse(data[0]); 
-        } catch (error) {
-            console.warn('Dictionary V2 Error, falling back to V1:', error.message);
+            // Tier 1: V1 API (Comprehensive Senses)
+            return await this.fetchV1(word);
+        } catch (v1Error) {
+            console.warn('Dictionary V1 Error, falling back to V2:', v1Error.message);
             try {
-                return await this.fetchV1(word);
-            } catch (v1Error) {
-                console.warn('Dictionary V1 Error, falling back to Wiktionary:', v1Error.message);
+                // Tier 2: V2 API (Standard Meanings)
+                const response = await fetch(`${this.BASE_URL}/${encodeURIComponent(word)}`);
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        throw new Error(`Sözlükte "${word}" kelimesi bulunamadı.`);
+                    }
+                    throw new Error('Sözlük API bağlantı hatası.');
+                }
+                const data = await response.json();
+                return this.parseResponse(data[0]); 
+            } catch (v2Error) {
+                console.warn('Dictionary V2 Error, falling back to Wiktionary:', v2Error.message);
                 try {
                     return await this.fetchWiktionary(word);
                 } catch (wiktiError) {
