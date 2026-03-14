@@ -22,7 +22,7 @@ class SessionManager {
                 [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
             }
             
-            const toTake = Math.min(sentencesPerWord, shuffled.length);
+            const toTake = Math.min(sentencesPerMeaning, shuffled.length);
             
             for (let i = 0; i < toTake; i++) {
                 const sentence = shuffled[i];

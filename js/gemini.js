@@ -62,6 +62,65 @@ Return ONLY a valid JSON array of objects in this EXACT format for EVERY sentenc
 IMPORTANT: Return ONLY the JSON array. Do not include markdown formatting like \`\`\`json.`;
     },
 
+    async generateDictionaryMeaning(word) {
+        const apiKey = await this.getApiKey();
+        if (!apiKey) throw new Error('API anahtarı bulunamadı');
+
+        const prompt = `You are an expert English-Turkish dictionary compiler.
+        
+Task: The word/idiom/phrase "${word}" was not found in standard dictionary APIs.
+Please define this expression accurately in English. Include common slang, idiomatic uses, or colloquialisms if applicable.
+
+STRICT INSTRUCTIONS:
+1. Provide exactly ONE primary definition for the word/phrase.
+2. Identify the partOfSpeech (e.g., noun, verb, idiom, phrase).
+3. The definition MUST be in English and be short, clear, and accurate.
+
+IMPORTANT: Return ONLY a valid JSON object in this EXACT format. Do not use markdown blocks like \`\`\`json:
+{
+  "word": "${word}",
+  "audio": null,
+  "meanings": [
+    {
+      "partOfSpeech": "idiom",
+      "definition": "To deceive someone playfully; to tease someone.",
+      "example": null
+    }
+  ]
+}`;
+
+        const url = `${this.BASE_URL}/${this.MODEL}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }]
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error?.message || 'Gemini API failed to generate definition.');
+        }
+
+        const responseData = await response.json();
+        let textResponse = responseData.candidates[0].content.parts[0].text.trim();
+        
+        // Strip markdown if AI accidentally includes it
+        if (textResponse.startsWith('\`\`\`json')) {
+            textResponse = textResponse.replace(/^\`\`\`json/, '').replace(/\`\`\`$/, '').trim();
+        } else if (textResponse.startsWith('\`\`\`')) {
+            textResponse = textResponse.replace(/^\`\`\`/, '').replace(/\`\`\`$/, '').trim();
+        }
+        
+        try {
+            return JSON.parse(textResponse);
+        } catch (e) {
+            console.error("Failed to parse Gemini Dictionary response:", textResponse);
+            throw new Error("Geçersiz AI sözlük cevabı.");
+        }
+    },
+
     async processDictionaryMeanings(word, meanings, generateCount = 1, onProgress = null) {
         const apiKey = await this.getApiKey();
         if (!apiKey) throw new Error('API anahtarı bulunamadı');
