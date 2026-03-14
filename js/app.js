@@ -1378,16 +1378,39 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function handleInlineDelete() {
         if (!currentSession || !currentSession.currentCard || !currentSession.currentCard.sentence) return;
+        
+        const cardWord = currentSession.currentCard.word;
         const sentenceId = currentSession.currentCard.sentence.id;
         
         if (confirm('Bu cümleyi tamamen silmek istediğinize emin misiniz?')) {
             try {
+                // 1. Delete from DB
                 await DB.deleteSentenceById(sentenceId);
-                showToast('Hatalı cümle kalıcı olarak silindi. 🗑️', 'success');
-                // Decrement session position because we basically skipped this card entirely
+                
+                // 2. Remove from session memory
+                if (currentSession.wordSentences.has(cardWord)) {
+                    let sents = currentSession.wordSentences.get(cardWord);
+                    sents = sents.filter(s => s.id !== sentenceId);
+                    currentSession.wordSentences.set(cardWord, sents);
+                    
+                    // If the word has no more sentences left, don't ask it again.
+                    if (sents.length > 0) {
+                        currentSession.mainQueue.unshift(currentSession.currentCard);
+                    } else {
+                        // Card is totally consumed, decrement total session words to avoid hanging progress bar
+                        currentSession.stats.total = Math.max(1, currentSession.stats.total - 1);
+                    }
+                }
+
+                // 3. Re-adjust position since we didn't "answer" it properly
                 if (currentSession.position > 0) currentSession.position--;
-                // Load the exact same word again, but it will pick a different sentence next time it's drawn
-                currentSession.mainQueue.unshift(currentSession.currentCard);
+
+                // 4. Update the global dashboard UI so the "Sentence Count" decreases
+                await updateDashboard();
+
+                showToast('Hatalı cümle kalıcı olarak silindi. 🗑️', 'success');
+                
+                // 5. Load the next card
                 loadNextCard(); 
             } catch (e) {
                 showToast('Cümle silinirken hata oluştu.', 'error');
