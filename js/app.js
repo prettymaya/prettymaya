@@ -565,8 +565,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <button class="btn btn-ghost btn-sm btn-word-detail" data-word="${w.word}">
                         Detay
                     </button>
-                    <button class="btn btn-ghost btn-sm btn-word-generate-5" data-word="${w.word}" title="+5 Cümle Üret" style="color: var(--accent-purple-light); padding: 8px;">
-                        <i class="fa-solid fa-plus"></i> <span style="font-weight:bold;">5</span>
+                    <button class="btn btn-ghost btn-sm btn-word-generate-all" data-word="${w.word}" title="Tüm Anlamlara +3 AI Üret" style="color: var(--accent-purple-light); padding: 8px;">
+                        <i class="fa-solid fa-plus"></i> <span style="font-weight:bold;">3</span>
                     </button>
                 </td>
             `;
@@ -580,10 +580,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         // Bind generator buttons
-        document.querySelectorAll('.btn-word-generate-5').forEach(btn => {
+        document.querySelectorAll('.btn-word-generate-all').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const w = e.currentTarget.dataset.word;
-                generate5SentencesForWord(w, false);
+                generateSentencesForAllMeanings(w, 3);
             });
         });
     }
@@ -656,7 +656,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // We only process words that actually got added newly
                 const novelWordsData = parsedWordsData.filter(d => results.added.includes(d.word.toLowerCase()));
                 if (novelWordsData.length > 0) {
-                    startDictionaryTranslationProcess(novelWordsData);
+                    const countToGenerate = list.length < 10 ? 3 : 1;
+                    startDictionaryTranslationProcess(novelWordsData, countToGenerate);
                 }
             }
 
@@ -709,7 +710,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnCancelGen.textContent = 'İptal Ediliyor...';
     });
 
-    async function startDictionaryTranslationProcess(parsedWordsData) {
+    async function startDictionaryTranslationProcess(parsedWordsData, generateCount = 1) {
         const apiKey = await DB.getSetting('gemini_api_key');
         if (!apiKey) {
             showToast('Türkçe çeviri ve AI için Ayarlar\'dan API anahtarı girmelisiniz.', 'error');
@@ -732,7 +733,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             try {
                 // Pass meanings to Gemini for translation & fallback generation
-                const finalSentences = await GeminiService.processDictionaryMeanings(data.word, data.meanings);
+                const finalSentences = await GeminiService.processDictionaryMeanings(data.word, data.meanings, generateCount);
                 
                 // Save fully processed sentences to DB
                 await DB.addSentences(data.word.toLowerCase(), finalSentences);
@@ -894,6 +895,46 @@ document.addEventListener('DOMContentLoaded', async () => {
         showToast("Lütfen kelimenin ait olduğu anlam başlığının yanındaki '+3 Üret' butonunu kullanın.", "info");
     });
 
+    async function generateSentencesForAllMeanings(word, count = 3) {
+        const apiKey = await DB.getSetting('gemini_api_key');
+        if (!apiKey) {
+            showToast('Lütfen önce Ayarlar\'dan API anahtarı girin.', 'error');
+            return;
+        }
+
+        const meanings = await DB.getMeaningsForWord(word);
+        if(!meanings || meanings.length === 0) {
+            showToast("Kelimenin anlamları API'den çekilmemiş.", "error"); return;
+        }
+
+        const forcedPayload = meanings.map(m => ({
+            id: m.id,
+            partOfSpeech: m.partOfSpeech,
+            definition: m.definition,
+            example: null // Force generation
+        }));
+
+        cancelGeneration = false;
+        els.overlayGen.classList.add('visible');
+        els.genTotalNum.textContent = 1;
+        els.genCurrentNum.textContent = 0;
+        els.genProgressFill.style.width = '0%';
+        els.genCurrentWord.textContent = word + " (Tüm Anlamlar)";
+        els.btnCancelGen.textContent = 'İptal Et';
+
+        try {
+            const generatedArr = await GeminiService.processDictionaryMeanings(word, forcedPayload, count);
+            await DB.addSentences(word, generatedArr);
+            showToast(`${word} için toplam ${generatedArr.length} yeni AI cümlesi eklendi!`, 'success');
+        } catch (e) {
+            showToast(`Hata: ${e.message}`, 'error');
+        } finally {
+            els.overlayGen.classList.remove('visible');
+            await updateDashboard();
+            renderWordList();
+        }
+    }
+
     async function generateSentencesForSpecificMeaning(word, meaningId, count = 3) {
         const apiKey = await DB.getSetting('gemini_api_key');
         if (!apiKey) {
@@ -926,20 +967,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnCancelGen.textContent = 'İptal Et';
 
         try {
-            let totalGenerated = 0;
-            for(let i=0; i<count; i++) {
-                if(cancelGeneration) break;
-                
-                const generatedArr = await GeminiService.processDictionaryMeanings(word, forcedPayload);
-                await DB.addSentences(word, generatedArr);
-                
-                totalGenerated++;
-                els.genCurrentNum.textContent = totalGenerated;
-                els.genProgressFill.style.width = `${Math.round((totalGenerated/count)*100)}%`;
-                await new Promise(r => setTimeout(r, 600)); // Rate limit
-            }
-            
-            showToast(`${word} için ${totalGenerated} yeni AI cümlesi eklendi!`, 'success');
+            const generatedArr = await GeminiService.processDictionaryMeanings(word, forcedPayload, count);
+            await DB.addSentences(word, generatedArr);
+            showToast(`${word} için toplam ${generatedArr.length} yeni AI cümlesi eklendi!`, 'success');
         } catch (e) {
             showToast(`Hata: ${e.message}`, 'error');
         } finally {
@@ -947,8 +977,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             await updateDashboard();
             renderWordList();
             
-            // Eğer isFromModal ise modalı güncelleyip geri açabiliriz
-            if (isFromModal && !cancelGeneration) {
+            // Her durumda iptal edilmediyse modalı güncelleyip geri açalım
+            if (!cancelGeneration) {
                 await openWordDetails(word);
             }
         }
@@ -1490,7 +1520,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Render Card
         const parts = card.sentence.sentence.split('___');
-        els.fcSentence.innerHTML = parts[0] + '<span class="blank">___</span>' + (parts[1] || '');
+        const badge = card.sentence.source === 'dictionary' 
+            ? `<span style="background: rgba(var(--success-rgb), 0.2); color: var(--success); font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--success); vertical-align: middle; margin-right: 8px;" title="Sözlük Örneği"><i class="fa-solid fa-book"></i> Sözlük</span>`
+            : `<span style="background: rgba(var(--accent-purple-rgb), 0.2); color: var(--accent-purple-light); font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--accent-purple-darker); vertical-align: middle; margin-right: 8px;" title="Yapay Zeka"><i class="fa-solid fa-robot"></i> AI</span>`;
+        els.fcSentence.innerHTML = badge + parts[0] + '<span class="blank">___</span>' + (parts[1] || '');
         
         els.fcInput.value = '';
         els.fcInput.className = 'flashcard-input'; // reset classes
