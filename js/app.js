@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Settings
         inputApiKey: document.getElementById('setting-api-key'),
         selectMinSentences: document.getElementById('setting-min-sentences'),
+        checkEnableSentenceCreation: document.getElementById('setting-enable-sentence-creation'),
         btnTestApi: document.getElementById('btn-test-api'),
         btnSaveSettings: document.getElementById('btn-save-settings'),
         apiStatus: document.getElementById('api-status'),
@@ -292,6 +293,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const gistId = await DB.getSetting('github_gist_id');
         if (gistId) els.inputGistId.value = gistId;
+
+        const enableSentenceCreation = await DB.getSetting('enable_sentence_creation');
+        if (enableSentenceCreation !== undefined && enableSentenceCreation !== null) {
+            els.checkEnableSentenceCreation.checked = (enableSentenceCreation === 'true');
+        } else {
+            els.checkEnableSentenceCreation.checked = true; // default on
+        }
     }
 
     els.btnSaveSettings.addEventListener('click', async () => {
@@ -1332,7 +1340,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.btnNext.focus();
         } else {
             els.btnNext.innerHTML = 'Sıradaki <i class="fa-solid fa-chevron-right"></i>';
-            if (result.isCorrect) {
+            if (result.isCorrect && els.checkEnableSentenceCreation.checked) {
                 els.phaseWriting.classList.add('visible');
                 els.writingInput.value = '';
                 els.writingInput.focus();
@@ -1342,6 +1350,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (e.key === 'Enter') els.btnNext.click();
                 };
             } else {
+                els.phaseWriting.classList.remove('visible');
                 els.btnNext.focus();
             }
         }
