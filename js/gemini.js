@@ -127,6 +127,63 @@ IMPORTANT: Return ONLY a valid JSON object in this EXACT format. Do not use mark
         }
     },
 
+    async filterTopMeanings(word, meanings, maxKeep = 4) {
+        if (meanings.length <= maxKeep) return meanings;
+        
+        const apiKey = await this.getApiKey();
+        if (!apiKey) throw new Error('API anahtarı bulunamadı');
+
+        const prompt = `You are an expert English teacher.
+        
+Task: The word "${word}" has ${meanings.length} Dictionary definitions. Please select the TOP ${maxKeep} most common, useful, and frequently used meanings that are essential for someone to achieve general English fluency. Ignore archaic, highly technical, or extremely rare idioms.
+
+Input Meanings:
+${JSON.stringify(meanings.map((m, i) => ({ index: i, partOfSpeech: m.partOfSpeech, definition: m.definition })), null, 2)}
+
+STRICT INSTRUCTIONS:
+Return ONLY a valid JSON array of INTEGERS representing the \`index\` of the meanings you selected. Do not return markdown, text, or the definitions themselves. Wait, just the indices.
+Example output:
+[0, 2, 5, 8]`;
+
+        const url = `${this.BASE_URL}/${this.MODEL}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }]
+            })
+        });
+
+        if (!response.ok) {
+            console.warn("AI Meaning Filter failed, falling back to top N slice.");
+            return meanings.slice(0, maxKeep);
+        }
+
+        const responseData = await response.json();
+        let textResponse = responseData.candidates[0].content.parts[0].text.trim();
+        
+        if (textResponse.startsWith('\`\`\`json')) {
+            textResponse = textResponse.replace(/^\`\`\`json/, '').replace(/\`\`\`$/, '').trim();
+        } else if (textResponse.startsWith('\`\`\`')) {
+            textResponse = textResponse.replace(/^\`\`\`/, '').replace(/\`\`\`$/, '').trim();
+        }
+        
+        try {
+            const indices = JSON.parse(textResponse);
+            if (!Array.isArray(indices) || indices.length === 0) throw new Error("Invalid array");
+            
+            // Re-map the selected indices back to original objects
+            const selected = indices
+                .filter(i => typeof i === 'number' && i >= 0 && i < meanings.length)
+                .map(i => meanings[i]);
+                
+            return selected.length > 0 ? selected : meanings.slice(0, maxKeep);
+        } catch (e) {
+            console.warn("Failed to parse AI meaning filter response, falling back to slice:", textResponse);
+            return meanings.slice(0, maxKeep);
+        }
+    },
+
     async processDictionaryMeanings(word, meanings, generateCount = 1, onProgress = null) {
         const apiKey = await this.getApiKey();
         if (!apiKey) throw new Error('API anahtarı bulunamadı');

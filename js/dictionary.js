@@ -5,7 +5,9 @@ const DictionaryService = {
     async fetchWord(word) {
         try {
             // Tier 1: V1 API (Comprehensive Senses)
-            return await this.fetchV1(word);
+            const result = await this.fetchV1(word);
+            result.meanings = await GeminiService.filterTopMeanings(word, result.meanings);
+            return result;
         } catch (v1Error) {
             console.warn('Dictionary V1 Error, falling back to V2:', v1Error.message);
             try {
@@ -18,11 +20,15 @@ const DictionaryService = {
                     throw new Error('Sözlük API bağlantı hatası.');
                 }
                 const data = await response.json();
-                return this.parseResponse(data[0]); 
+                const result = this.parseResponse(data[0]); 
+                result.meanings = await GeminiService.filterTopMeanings(word, result.meanings);
+                return result;
             } catch (v2Error) {
                 console.warn('Dictionary V2 Error, falling back to Wiktionary:', v2Error.message);
                 try {
-                    return await this.fetchWiktionary(word);
+                    const result = await this.fetchWiktionary(word);
+                    result.meanings = await GeminiService.filterTopMeanings(word, result.meanings);
+                    return result;
                 } catch (wiktiError) {
                     console.warn('Wiktionary failed for literal word. Falling back to Gemini...', wiktiError.message);
                     
