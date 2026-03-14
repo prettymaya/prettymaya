@@ -15,20 +15,24 @@ const DictionaryService = {
             const data = await response.json();
             return this.parseResponse(data[0]); 
         } catch (error) {
-            console.warn('DictionaryAPI Error, falling back to Wiktionary:', error.message);
+            console.warn('Dictionary V2 Error, falling back to V1:', error.message);
             try {
-                return await this.fetchWiktionary(word);
-            } catch (wiktiError) {
-                console.warn('Wiktionary failed for literal word. Falling back to Gemini...', wiktiError.message);
-                
-                
-                // Ultimate Fallback: Gemini AI Dictionary
+                return await this.fetchV1(word);
+            } catch (v1Error) {
+                console.warn('Dictionary V1 Error, falling back to Wiktionary:', v1Error.message);
                 try {
-                    console.log('Routing unknown phrase to Gemini AI Dictionary Generation:', word);
-                    return await GeminiService.generateDictionaryMeaning(word);
-                } catch (geminiError) {
-                    console.error('All Dictionary Fallbacks failed:', geminiError);
-                    throw new Error(`Sözlükte "${word}" anlamı bulunamadı.`);
+                    return await this.fetchWiktionary(word);
+                } catch (wiktiError) {
+                    console.warn('Wiktionary failed for literal word. Falling back to Gemini...', wiktiError.message);
+                    
+                    // Ultimate Fallback: Gemini AI Dictionary
+                    try {
+                        console.log('Routing unknown phrase to Gemini AI Dictionary Generation:', word);
+                        return await GeminiService.generateDictionaryMeaning(word);
+                    } catch (geminiError) {
+                        console.error('All Dictionary Fallbacks failed:', geminiError);
+                        throw new Error(`Sözlükte "${word}" anlamı bulunamadı.`);
+                    }
                 }
             }
         }
@@ -48,7 +52,7 @@ const DictionaryService = {
             m.definitions.forEach(def => {
                 const meaningObj = {
                     partOfSpeech: partOfSpeech,
-                    definition: def.definition,
+                    definition: def.definition + " [v2]",
                     example: null // Enforce AI generation
                 };
                 
@@ -67,6 +71,48 @@ const DictionaryService = {
         // Prioritize US or UK audio, or just the first valid audio link
         const audioEntry = phonetics.find(p => p.audio && p.audio.length > 0);
         return audioEntry ? audioEntry.audio : null;
+    },
+
+    async fetchV1(word) {
+        const url = `https://freedictionaryapi.com/api/v1/entries/en/${encodeURIComponent(word)}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`V1 Sözlükte "${word}" kelimesi bulunamadı.`);
+        }
+        
+        const data = await response.json();
+        
+        const result = {
+            word: word,
+            audio: null,
+            meanings: []
+        };
+        
+        // V1 Schema returns an array of entries (one per Part of Speech etc.)
+        if (data.entries && Array.isArray(data.entries)) {
+            data.entries.forEach(entry => {
+                const partOfSpeech = entry.partOfSpeech || 'unknown';
+                
+                if (entry.senses && Array.isArray(entry.senses)) {
+                    entry.senses.forEach(sense => {
+                        if (sense.definition) {
+                            result.meanings.push({
+                                partOfSpeech: partOfSpeech,
+                                definition: sense.definition + " [v1]",
+                                example: null
+                            });
+                        }
+                    });
+                }
+            });
+        }
+        
+        if (result.meanings.length === 0) {
+            throw new Error(`V1 Sözlükte "${word}" için geçerli bir anlam bulunamadı.`);
+        }
+        
+        return result;
     },
 
     async fetchWiktionary(word) {
@@ -140,7 +186,7 @@ const DictionaryService = {
                     if (cleanDef && cleanDef.length > 5 && !isRedirect && contentHasWord) {
                         result.meanings.push({
                             partOfSpeech: partOfSpeech,
-                            definition: cleanDef,
+                            definition: cleanDef + " [Wiki]",
                             example: null // Enforce AI generation
                         });
                     }
