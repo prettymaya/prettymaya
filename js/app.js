@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         detailSentencesList: document.getElementById('detail-sentences-list'),
         btnCloseDetailModal1: document.getElementById('btn-close-detail-modal'),
         btnCloseDetailModal2: document.getElementById('btn-close-detail-modal2'),
-        btnGenerate5Sentences: document.getElementById('btn-generate-5-sentences'),
+        btnDetailGenerateAll: document.getElementById('btn-detail-generate-all'),
         btnDeleteWord: document.getElementById('btn-delete-word'),
 
         // Generation Overlay
@@ -890,9 +890,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    els.btnGenerate5Sentences.addEventListener('click', () => {
-        // Global "Generate 5" is deprecated. Using definition-specific generation now.
-        showToast("Lütfen kelimenin ait olduğu anlam başlığının yanındaki '+3 Üret' butonunu kullanın.", "info");
+    els.btnDetailGenerateAll.addEventListener('click', () => {
+        if (!currentDetailWord) return;
+        generateSentencesForAllMeanings(currentDetailWord, 3);
     });
 
     async function generateSentencesForAllMeanings(word, count = 3) {
