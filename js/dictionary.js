@@ -1,6 +1,30 @@
-// PrettyMaya - Free Dictionary API Integration
 const DictionaryService = {
     BASE_URL: 'https://api.dictionaryapi.dev/api/v2/entries/en',
+
+    async fetchWithRetry(url, options = {}, retries = 2, backoff = 1000) {
+        try {
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                // If it's a 404 (Not Found), don't retry, it just means the word doesn't exist.
+                if (response.status === 404) {
+                    return response;
+                }
+                
+                // If it's a server error (5xx) or Rate Limit (429), throw to trigger retry
+                if (response.status >= 500 || response.status === 429) {
+                    throw new Error(`Server returned ${response.status}`);
+                }
+            }
+            return response;
+        } catch (error) {
+            if (retries > 0) {
+                console.warn(`Fetch failed (${error.message}). Retrying in ${backoff}ms... (${retries} retries left)`);
+                await new Promise(resolve => setTimeout(resolve, backoff));
+                return this.fetchWithRetry(url, options, retries - 1, backoff * 2);
+            }
+            throw error;
+        }
+    },
 
     async fetchWord(word) {
         try {
@@ -12,7 +36,7 @@ const DictionaryService = {
             console.warn('Dictionary V1 Error, falling back to V2:', v1Error.message);
             try {
                 // Tier 2: V2 API (Standard Meanings)
-                const response = await fetch(`${this.BASE_URL}/${encodeURIComponent(word)}`);
+                const response = await this.fetchWithRetry(`${this.BASE_URL}/${encodeURIComponent(word)}`);
                 if (!response.ok) {
                     if (response.status === 404) {
                         throw new Error(`Sözlükte "${word}" kelimesi bulunamadı.`);
@@ -82,7 +106,7 @@ const DictionaryService = {
 
     async fetchV1(word) {
         const url = `https://freedictionaryapi.com/api/v1/entries/en/${encodeURIComponent(word)}`;
-        const response = await fetch(url);
+        const response = await this.fetchWithRetry(url);
         
         if (!response.ok) {
             throw new Error(`V1 Sözlükte "${word}" kelimesi bulunamadı.`);
@@ -126,11 +150,11 @@ const DictionaryService = {
         const titleCaseWord = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
         
         let url = `https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(word.toLowerCase())}`;
-        let response = await fetch(url);
+        let response = await this.fetchWithRetry(url);
         
         if (!response.ok && response.status === 404) {
              url = `https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(titleCaseWord)}`;
-             response = await fetch(url);
+             response = await this.fetchWithRetry(url);
         }
 
         if (!response.ok) {
