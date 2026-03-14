@@ -117,6 +117,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnReadingNext: document.getElementById('btn-reading-next'),
         btnQuitSession: document.getElementById('btn-quit-session'),
         
+        // Speaking Phase
+        btnModeSpeaking: document.getElementById('mode-speaking'),
+        phaseSpeaking: document.getElementById('phase-speaking'),
+        speakingWordsContainer: document.getElementById('speaking-words-container'),
+        btnSpeakingNext: document.getElementById('btn-speaking-next'),
+        
         resIcon: document.getElementById('res-icon'),
         resWord: document.getElementById('res-word'),
         resEnglish: document.getElementById('res-english'),
@@ -941,10 +947,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnModeRecall.className = 'btn btn-secondary';
         els.btnModeReading.className = 'btn btn-secondary';
         els.btnModeMixed.className = 'btn btn-secondary';
+        if (els.btnModeSpeaking) els.btnModeSpeaking.className = 'btn btn-secondary';
         els.readingSetupOpts.style.display = 'block';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle ısınma yapmak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
+    
+    if (els.btnModeSpeaking) {
+        els.btnModeSpeaking.addEventListener('click', () => {
+            practiceMode = 'speaking';
+            els.btnModeSpeaking.className = 'btn btn-primary';
+            els.btnModeRecall.className = 'btn btn-secondary';
+            els.btnModeReading.className = 'btn btn-secondary';
+            els.btnModeMixed.className = 'btn btn-secondary';
+            els.btnModeWarmup.className = 'btn btn-secondary';
+            els.readingSetupOpts.style.display = 'block';
+            els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Sohbette kullanmak için kaç kelime istiyorsun?';
+            els.countSelectors[0].parentElement.style.display = 'flex';
+        });
+    }
     
     els.btnWarmupNext.addEventListener('click', () => {
         loadNextCard();
@@ -959,6 +980,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         loadNextCard();
     });
+
+    if (els.btnSpeakingNext) {
+        els.btnSpeakingNext.addEventListener('click', () => {
+            loadNextCard();
+        });
+    }
 
     els.btnGoBack.addEventListener('click', () => {
         if (goBackHistory.length < 2) return;
@@ -1080,6 +1107,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (practiceMode === 'warmup') {
             const c = parseInt(els.selectReadingCount.value);
             currentSession = new WarmUpSessionManager(filteredMap, c);
+        } else if (practiceMode === 'speaking') {
+            currentSession = new SpeakingSessionManager([...filteredMap.keys()], filteredMap);
         } else {
             currentSession = new SessionManager(filteredMap, 1);
         }
@@ -1101,7 +1130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const prog = currentSession.getProgress();
         let displayCurrent = 1;
         
-        if (practiceMode === 'reading' || practiceMode === 'warmup') {
+        if (practiceMode === 'reading' || practiceMode === 'warmup' || practiceMode === 'speaking') {
             displayCurrent = prog.stats.correct || 1; 
         } else {
             const retries = currentSession.retryInserts ? currentSession.retryInserts.length : 0;
@@ -1155,6 +1184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.phaseResult.classList.remove('visible');
             els.phaseWriting.classList.remove('visible');
             els.phaseReading.style.display = 'none';
+            if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
             
             els.warmupWord.textContent = card.word;
             
@@ -1182,6 +1212,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.phaseQuestion.style.display = 'none';
             els.phaseResult.classList.remove('visible');
             els.phaseWriting.classList.remove('visible');
+            if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
             
             // Prepare reading card
             const parts = card.sentence.sentence.split('___');
@@ -1200,9 +1231,57 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        if (currentCardMode === 'speaking') {
+            els.phaseQuestion.style.display = 'none';
+            els.phaseResult.classList.remove('visible');
+            els.phaseWriting.classList.remove('visible');
+            els.phaseReading.style.display = 'none';
+            els.phaseWarmup.style.display = 'none';
+            
+            if (els.speakingWordsContainer) {
+                els.speakingWordsContainer.innerHTML = '';
+                
+                // card is actually an array of up to 3 cards for speaking mode
+                card.forEach((c, index) => {
+                    const cardHtml = `
+                        <div style="background: var(--bg-glass); border-radius: 16px; padding: 24px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between;">
+                            <div>
+                                <h3 style="color: var(--warning); font-size: 2.2rem; font-weight: 800; margin-bottom: 16px; text-transform: lowercase;">${c.word}</h3>
+                                <button class="btn btn-ghost btn-sm btn-show-hint-speaking" data-index="${index}" style="margin-bottom: 12px; font-size: 0.85rem; color: var(--text-muted);"><i class="fa-solid fa-eye"></i> İpucu Göster</button>
+                                <div class="speaking-hint-container" id="speaking-hint-${index}" style="display: none; background: rgba(16, 185, 129, 0.1); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 12px;">
+                                    ${c.meanings.map(m => `<div style="color: var(--success); font-size: 0.95rem; margin-bottom: 4px;">• ${m}</div>`).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    els.speakingWordsContainer.insertAdjacentHTML('beforeend', cardHtml);
+                });
+                
+                // Attach event listeners to hint buttons
+                document.querySelectorAll('.btn-show-hint-speaking').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const idx = e.currentTarget.getAttribute('data-index');
+                        const hintDiv = document.getElementById(`speaking-hint-${idx}`);
+                        if (hintDiv.style.display === 'none') {
+                            hintDiv.style.display = 'block';
+                            e.currentTarget.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Gizle';
+                        } else {
+                            hintDiv.style.display = 'none';
+                            e.currentTarget.innerHTML = '<i class="fa-solid fa-eye"></i> İpucu Göster';
+                        }
+                    });
+                });
+            }
+            
+            if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'block';
+            if (els.btnSpeakingNext) els.btnSpeakingNext.focus();
+            return;
+        }
+
         // Active Recall Mode
         els.phaseReading.style.display = 'none';
         els.phaseWarmup.style.display = 'none';
+        if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
 
         // Check if retry
         const state = currentSession.wordState.get(card.cardKey);

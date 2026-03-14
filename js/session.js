@@ -336,3 +336,64 @@ class WarmUpSessionManager {
         };
     }
 }
+
+class SpeakingSessionManager {
+    constructor(wordList, wordSentences) {
+        this.wordList = [...wordList];
+        this.wordSentences = wordSentences;
+        this.mainQueue = [];
+        this.position = 0;
+        this.stats = { total: 0, correct: 0, incorrect: 0 };
+        this.currentCards = null;
+
+        // Build queue
+        for (const word of this.wordList) {
+            const sentences = this.wordSentences.get(word) || [];
+            if (sentences.length === 0) continue;
+            
+            const shuffledSentences = [...sentences].sort(() => 0.5 - Math.random());
+            const selectedSentences = shuffledSentences.slice(0, 3);
+            const meanings = selectedSentences.map(s => s.hint);
+
+            this.mainQueue.push({
+                word: word,
+                meanings: [...new Set(meanings)]
+            });
+        }
+        
+        // Shuffle the entire queue
+        for (let i = this.mainQueue.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.mainQueue[i], this.mainQueue[j]] = [this.mainQueue[j], this.mainQueue[i]];
+        }
+        
+        // Chunk by 3
+        this.chunks = [];
+        for (let i = 0; i < this.mainQueue.length; i += 3) {
+            this.chunks.push(this.mainQueue.slice(i, i + 3));
+        }
+        
+        this.stats.total = this.chunks.length;
+    }
+
+    getNextCard() {
+        if (this.chunks.length > 0) {
+            this.currentCards = this.chunks.shift();
+            this.position++;
+            // Use 'correct' just to fill the progress bar gracefully
+            this.stats.correct = this.position; 
+            return this.currentCards; // an array of up to 3 word objects
+        }
+        this.currentCards = null;
+        return null;
+    }
+
+    getProgress() {
+        return {
+            totalWords: this.stats.total,
+            remaining: this.chunks.length,
+            percentage: this.stats.total > 0 ? Math.round((this.position / this.stats.total) * 100) : 0,
+            stats: this.stats
+        };
+    }
+}

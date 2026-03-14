@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" href="icon.png">
     <!-- Icons: FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="css/style.css?v=29">
+    <link rel="stylesheet" href="css/style.css?v=30">
 </head>
 <body>
 
@@ -171,6 +171,7 @@
                             <button class="btn btn-secondary" id="mode-reading">Sadece Okuma</button>
                             <button class="btn btn-secondary" id="mode-mixed">Karışık</button>
                             <button class="btn btn-secondary" id="mode-warmup" style="background: rgba(16, 185, 129, 0.15); color: var(--success); border-color: rgba(16, 185, 129, 0.3);">Isınma (Warm Up)</button>
+                            <button class="btn btn-secondary" id="mode-speaking" style="background: rgba(249, 115, 22, 0.15); color: var(--warning); border-color: rgba(249, 115, 22, 0.3);">Konuşma Oyunu (AI)</button>
                         </div>
 
                         <!-- Setup specific options -->
@@ -352,6 +353,20 @@
                             
                             <button class="btn btn-primary btn-lg" id="btn-warmup-next" style="width: 100%; max-width: 300px; margin: 0 auto;">
                                 Sonraki <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+
+                        <!-- Speaking Phase -->
+                        <div id="phase-speaking" style="display: none; padding: 10px;">
+                            <div style="margin-bottom: 24px; text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
+                                AI veya bir arkadaşınla sesli sohbette kullanmak üzere bu 3 kelimeyi cümlende geçir!
+                            </div>
+                            <div id="speaking-words-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 40px;">
+                                <!-- Words injected via JS -->
+                            </div>
+                            
+                            <button class="btn btn-primary btn-lg" id="btn-speaking-next" style="width: 100%; max-width: 300px; margin: 0 auto; display: block;">
+                                Sıradaki 3 Kelime <i class="fa-solid fa-forward"></i>
                             </button>
                         </div>
 
@@ -628,10 +643,10 @@
     <div class="toast-container" id="toast-container"></div>
 
     <!-- Scripts -->
-    <script src="js/db.js?v=29"></script>
-    <script src="js/sync.js?v=29"></script>
-    <script src="js/gemini.js?v=29"></script>
-    <script src="js/session.js?v=29"></script>
-    <script src="js/app.js?v=29"></script>
+    <script src="js/db.js?v=30"></script>
+    <script src="js/sync.js?v=30"></script>
+    <script src="js/gemini.js?v=30"></script>
+    <script src="js/session.js?v=30"></script>
+    <script src="js/app.js?v=30"></script>
 </body>
 </html>
