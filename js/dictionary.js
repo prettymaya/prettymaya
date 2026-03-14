@@ -75,6 +75,15 @@ const DictionaryService = {
             throw new Error(`Wiktionary'de "${word}" kelimesi bulunamadı.`);
         }
 
+        // Strict Matching: Ensure Wiktionary didn't redirect us to a completely different word
+        const resolvedTitle = decodeURIComponent(response.url.split('/').pop().toLowerCase());
+        const expectedWord = word.toLowerCase();
+        
+        // Allow minor case differences, but block completely different words (e.g. Wiktionary fuzzy matching)
+        if (resolvedTitle !== expectedWord) {
+            throw new Error(`Wiktionary "${word}" kelimesini bulamadı. (Bunun yerine "${resolvedTitle}" sonucunu verdi).`);
+        }
+
         const data = await response.json();
         
         const result = {
@@ -95,7 +104,31 @@ const DictionaryService = {
             if (posGroup.definitions && Array.isArray(posGroup.definitions)) {
                 posGroup.definitions.forEach(defObj => {
                     const cleanDef = defObj.definition.replace(/<[^>]*>/g, '').trim(); 
-                    if (cleanDef && cleanDef.length > 5 && !cleanDef.includes("plural of") && !cleanDef.includes("third-person singular")) {
+                    
+                    // Filter out meaningless redirect definitions
+                    const isRedirect = cleanDef.includes("plural of") || 
+                                       cleanDef.includes("third-person singular") ||
+                                       cleanDef.includes("Alternative form of") ||
+                                       cleanDef.includes("Alternative spelling of") ||
+                                       cleanDef.includes("past participle of");
+                                       
+                    // Strict Context Matching: The definition or its examples MUST contain the word
+                    // Sometimes definitions don't contain the word, but their examples do.
+                    let contentHasWord = cleanDef.toLowerCase().includes(expectedWord);
+                    
+                    if (!contentHasWord && defObj.parsedExamples) {
+                        for (const ex of defObj.parsedExamples) {
+                            if (ex.example && ex.example.toLowerCase().includes(expectedWord)) {
+                                contentHasWord = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // For extremely short words (like "run"), the examples check is crucial.
+                    // If we couldn't find the word in the definition or examples, it might be an unrelated redirect, 
+                    // or a highly abstracted definition. To be extremely safe as per user request:
+                    if (cleanDef && cleanDef.length > 5 && !isRedirect && contentHasWord) {
                         result.meanings.push({
                             partOfSpeech: partOfSpeech,
                             definition: cleanDef,

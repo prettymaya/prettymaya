@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ─── State ──────────────────────────────────────────────
     let allWords = [];
     let sentenceCounts = {};
-    let minSentencesRequired = 10;
+    let minSentencesRequired = 2;
     let cancelGeneration = false;
     let currentSession = null;
     let selectedWordCount = 20;
@@ -628,9 +628,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             for (const dictWord of list) {
                 try {
-                    // Check if already exists fast
-                    const existingCheck = await DB.getSentencesForWord(dictWord.toLowerCase());
-                    if (existingCheck.length > 0) {
+                    // Check if already exists fast using the loaded words list
+                    const exists = allWords.some(w => w.word === dictWord.toLowerCase());
+                    if (exists) {
                         results.existing.push(dictWord);
                         continue;
                     }
