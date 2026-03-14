@@ -890,6 +890,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (practiceMode === 'warmup') {
             const c = parseInt(els.selectReadingCount.value);
             currentSession = new WarmUpSessionManager(readyWordsMap, c);
+        } else if (practiceMode === 'speaking') {
+            currentSession = new SpeakingSessionManager([...readyWordsMap.keys()], readyWordsMap);
         } else {
             currentSession = new SessionManager(readyWordsMap, 1);
         }
