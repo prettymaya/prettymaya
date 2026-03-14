@@ -1,6 +1,6 @@
 // PrettyMaya - Gemini API Service
 const GeminiService = {
-    MODEL: 'gemini-2.5-flash-lite',
+    MODEL: 'gemini-3.1-flash-lite-preview',
     BASE_URL: 'https://generativelanguage.googleapis.com/v1beta/models',
 
     async getApiKey() {
