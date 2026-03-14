@@ -38,9 +38,11 @@ STRICT RULES:
 4. Difficulty: medium (everyday conversational to light academic).
 5. Length: medium (8-16 words per sentence).
 6. Replace the target word (or its grammatically modified form) with "___" (three underscores). 
-   - CRITICAL DICTATE: If the target vocabulary is a MULTI-WORD expression, phrasal verb, or idiom (e.g., "carve out", "habit stacking", "put up with"), you MUST replace the ENTIRE expression as a single block of "___". Do NOT leave parts of the expression visible (e.g., replacing only "carve" and leaving "out"). The \`answer\` field MUST contain the full exact phrase you removed.
+   - CRITICAL DICTATE FOR PHRASAL VERBS: If the target vocabulary is a MULTI-WORD expression (e.g., "carve out", "put up with"), you MUST remove the ENTIRE expression from the sentence and replace it with a SINGLE "___". 
+   - DO NOT leave any part of the expression behind. For example, if the word is "carve out", you MUST write "She ___ a niche" (where answer="carved out"). Do NOT write "She ___ out a niche".
+   - The \`answer\` field MUST contain the full exact phrase you removed.
 7. The word may appear in different grammatical forms (e.g., "leave" → "left", "leaving", "leaves" OR "act" → "acting", "action", "active").
-   - EXTREMELY IMPORTANT: The \`answer\` MUST ALWAYS be the exact word "${word}" or a direct grammatical derivation of it. NEVER use a synonym (like using "rid" when the target is "vice").
+   - EXTREMELY IMPORTANT: The \`answer\` MUST ALWAYS be the exact target phrase "${word}" or a direct grammatical derivation of it. NEVER use a synonym (like using "rid" when the target is "vice").
 8. Each sentence MUST provide a DIFFERENT context. You may reuse meanings if the word doesn't have enough distinct meanings to fulfill the count, but the contexts/sentences must be different.
 9. Turkish translations must be natural and fluent — not word-by-word translations. Capture the exact nuanced meaning the word has in that specific sentence.
 10. The "hint" field should contain the exact Turkish meaning of the word form used in that specific sentence (e.g. if used as a noun, give noun meaning; if verb, give verb meaning).
