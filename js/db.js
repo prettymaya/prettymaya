@@ -171,11 +171,21 @@ const DB = {
         });
     },
 
+    async getAllSentences() {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('sentences', 'readonly');
+            const store = tx.objectStore('sentences');
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
     async getAllSentenceCounts() {
-        const words = await this.getAllWords();
+        const sentences = await this.getAllSentences();
         const counts = {};
-        for (const w of words) {
-            counts[w.word] = await this.getSentenceCountForWord(w.word);
+        for (const s of sentences) {
+            counts[s.word] = (counts[s.word] || 0) + 1;
         }
         return counts;
     },

@@ -503,13 +503,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Calculate active meanings mapping (Cards)
         const activeMeanings = new Set();
-        for (const w of allWords) {
-            const sentences = await DB.getSentencesForWord(w.word);
-            sentences.forEach(s => {
-                const mId = s.meaningId || `uncategorized_${w.word}`;
-                activeMeanings.add(mId);
-            });
-        }
+        const allSentences = await DB.getAllSentences();
+        
+        allSentences.forEach(s => {
+            const mId = s.meaningId || `uncategorized_${s.word}`;
+            activeMeanings.add(mId);
+        });
 
         const meaningCount = activeMeanings.size;
 

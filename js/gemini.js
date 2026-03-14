@@ -114,7 +114,13 @@ IMPORTANT: Return ONLY a valid JSON object in this EXACT format. Do not use mark
         }
         
         try {
-            return JSON.parse(textResponse);
+            const parsed = JSON.parse(textResponse);
+            if (parsed.meanings && Array.isArray(parsed.meanings)) {
+                parsed.meanings.forEach(m => {
+                    m.definition = m.definition + " (🤖 AI Üretimi)";
+                });
+            }
+            return parsed;
         } catch (e) {
             console.error("Failed to parse Gemini Dictionary response:", textResponse);
             throw new Error("Geçersiz AI sözlük cevabı.");

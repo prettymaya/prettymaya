@@ -19,37 +19,8 @@ const DictionaryService = {
             try {
                 return await this.fetchWiktionary(word);
             } catch (wiktiError) {
-                console.warn('Wiktionary failed for literal word. Attempting pronoun stripping...', wiktiError.message);
+                console.warn('Wiktionary failed for literal word. Falling back to Gemini...', wiktiError.message);
                 
-                // Pronoun Stripping Logic
-                const pronouns = ["somebody", "someone", "something", "anybody", "anyone", "anything", "my", "your", "his", "her", "its", "our", "their", "him", "them", "me", "us"];
-                const regex = new RegExp(`\\b(${pronouns.join('|')})\\b`, 'gi');
-                let strippedWord = word.replace(regex, '').replace(/\s+/g, ' ').trim();
-                
-                if (strippedWord && strippedWord !== word && strippedWord.length > 2) {
-                    try {
-                        const strippedResult = await this.fetchWiktionary(strippedWord);
-                        // Successful lookup on stripped word, but return it under the ORIGINAL user word
-                        strippedResult.word = word; 
-                        
-                        // Per user request: if found by stripping, Gemini MUST also generate 1 meaning
-                        // for the EXACT unstripped word to cover the specific nuanced usage.
-                        try {
-                            console.log('Fetching supplemental Gemini meaning for exact phrase:', word);
-                            const geminiExtra = await GeminiService.generateDictionaryMeaning(word);
-                            if (geminiExtra && geminiExtra.meanings) {
-                                // Add Gemini's meaning to the top of the list
-                                strippedResult.meanings = [...geminiExtra.meanings, ...strippedResult.meanings];
-                            }
-                        } catch (aiErr) {
-                            console.warn("Supplemental AI meaning failed, continuing with stripped results:", aiErr);
-                        }
-                        
-                        return strippedResult;
-                    } catch (strippedError) {
-                        console.warn(`Stripped Wiktionary (${strippedWord}) also failed. Passing to Gemini.`);
-                    }
-                }
                 
                 // Ultimate Fallback: Gemini AI Dictionary
                 try {
