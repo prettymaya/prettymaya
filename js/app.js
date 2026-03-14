@@ -501,7 +501,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const history = await DB.getSessionHistory();
 
-        els.stats.words.textContent = allWords.length;
+        // Calculate active meanings mapping (Cards)
+        const activeMeanings = new Set();
+        for (const w of allWords) {
+            const sentences = await DB.getSentencesForWord(w.word);
+            sentences.forEach(s => {
+                const mId = s.meaningId || `uncategorized_${w.word}`;
+                activeMeanings.add(mId);
+            });
+        }
+
+        const meaningCount = activeMeanings.size;
+
+        els.stats.words.textContent = `${allWords.length} Kelime (${meaningCount} Kart)`;
+        els.stats.words.style.fontSize = "1.5rem"; // Reduce font slightly to fit the longer string
         els.stats.sentences.textContent = totalSentences;
         els.stats.sessions.textContent = history.length;
     }
@@ -1304,39 +1317,56 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     els.btnStartSession.addEventListener('click', async () => {
-        const readyWordsMap = new Map();
+        const readyMeaningsMap = new Map();
+        
         for (const w of allWords) {
             const word = w.word;
-            const count = sentenceCounts[word] || 0;
-            // Strict minimum filter
-            if (count >= minSentencesRequired) {
-                const sentences = await DB.getSentencesForWord(word);
-                readyWordsMap.set(word, sentences);
+            const sentences = await DB.getSentencesForWord(word);
+            const wordMeanings = await DB.getMeaningsForWord(word);
+            
+            // Group sentences by meaningId
+            const meaningGroups = {};
+            sentences.forEach(s => {
+                const mId = s.meaningId || `uncategorized_${word}`;
+                if (!meaningGroups[mId]) meaningGroups[mId] = [];
+                
+                // Embed the English dictionary definition for Hints
+                const meaningData = wordMeanings.find(m => m.id == mId);
+                s.englishDefinition = meaningData ? meaningData.definition : "Anlam bulunamadı";
+                
+                meaningGroups[mId].push(s);
+            });
+
+            // Only include meanings that have enough sentences
+            for (const [mId, sList] of Object.entries(meaningGroups)) {
+                if (sList.length >= minSentencesRequired) {
+                    readyMeaningsMap.set(mId, sList);
+                }
             }
         }
 
-        if (readyWordsMap.size === 0) {
-            showToast(`Pratik yapmak için en az ${minSentencesRequired} cümlesi olan kelimelere ihtiyacınız var. Kelimeler sekmesinden "Eksikleri Üret" butonuna basın.`, 'error');
+        if (readyMeaningsMap.size === 0) {
+            showToast(`Pratik yapmak için en az ${minSentencesRequired} cümlesi olan kelime veya anlama ihtiyacınız var. Kelimeler sekmesinden "Eksikleri Üret" butonuna basın.`, 'error');
             return;
         }
 
-        // Apply limit
-        let wordsToUse = Array.from(readyWordsMap.entries());
+        // Apply limit based on meanings, not base words
+        let meaningsToUse = Array.from(readyMeaningsMap.entries());
         
-        // Shuffle all valid words first
-        for (let i = wordsToUse.length - 1; i > 0; i--) {
+        // Shuffle all valid meanings first
+        for (let i = meaningsToUse.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [wordsToUse[i], wordsToUse[j]] = [wordsToUse[j], wordsToUse[i]];
+            [meaningsToUse[i], meaningsToUse[j]] = [meaningsToUse[j], meaningsToUse[i]];
         }
 
         if (selectedWordCount !== 'all') {
             const limit = parseInt(selectedWordCount);
-            if (wordsToUse.length > limit) {
-                wordsToUse = wordsToUse.slice(0, limit);
+            if (meaningsToUse.length > limit) {
+                meaningsToUse = meaningsToUse.slice(0, limit);
             }
         }
 
-        const filteredMap = new Map(wordsToUse);
+        const filteredMap = new Map(meaningsToUse);
 
         // Init Session Manager based on mode
         if (practiceMode === 'reading') {
@@ -1489,8 +1519,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <div>
                                 <h3 style="color: var(--warning); font-size: 2.2rem; font-weight: 800; margin-bottom: 16px; text-transform: lowercase;">${c.word}</h3>
                                 <button class="btn btn-ghost btn-sm btn-show-hint-speaking" data-index="${index}" style="margin-bottom: 12px; font-size: 0.85rem; color: var(--text-muted);"><i class="fa-solid fa-eye"></i> İpucu Göster</button>
-                                <div class="speaking-hint-container" id="speaking-hint-${index}" style="display: none; background: rgba(16, 185, 129, 0.1); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 12px;">
-                                    ${c.meanings.map(m => `<div style="color: var(--success); font-size: 0.95rem; margin-bottom: 4px;">• ${m}</div>`).join('')}
+                                <div class="speaking-hint-container" id="speaking-hint-${index}" style="display: none; background: rgba(16, 185, 129, 0.1); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 12px; text-align: left;">
+                                    <div style="color: var(--text-primary); font-size: 0.95rem; margin-bottom: 8px; font-weight: 500; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;">EN: ${c.englishDefinition}</div>
+                                    <div style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 4px;">Kısa Türkçe İpuçları:</div>
+                                    ${c.meanings.map(m => `<div style="color: var(--success); font-size: 0.9rem; margin-bottom: 2px;">• ${m}</div>`).join('')}
                                 </div>
                             </div>
                         </div>

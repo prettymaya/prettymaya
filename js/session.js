@@ -1,8 +1,8 @@
 // PrettyMaya - Session Manager (Spaced Repetition within Session)
 class SessionManager {
-    constructor(wordSentencesMap, sentencesPerWord = 1) {
-        // wordSentencesMap: Map<string, Array<{id, sentence, answer, turkish, hint}>>
-        this.wordSentences = wordSentencesMap;
+    constructor(meaningSentencesMap, sentencesPerMeaning = 1) {
+        // meaningSentencesMap: Map<string, Array<{id, sentence, answer, turkish, hint, word, meaningId}>>
+        this.meaningSentences = meaningSentencesMap;
         this.mainQueue = [];
         this.retryInserts = []; // {card, insertAtPosition, consecutiveCorrect}
         this.position = 0;
@@ -10,9 +10,11 @@ class SessionManager {
         this.stats = { correct: 0, incorrect: 0, total: 0 };
         this.wordState = new Map(); // Per-card tracking
 
-        // Build initial queue: 'sentencesPerWord' sentences per word
-        for (const [word, sentences] of wordSentencesMap) {
+        // Build initial queue: 'sentencesPerMeaning' sentences per meaning
+        for (const [mId, sentences] of meaningSentencesMap) {
             if (sentences.length === 0) continue;
+            
+            const word = sentences[0].word;
             
             const shuffled = [...sentences];
             for (let i = shuffled.length - 1; i > 0; i--) {
@@ -24,11 +26,12 @@ class SessionManager {
             
             for (let i = 0; i < toTake; i++) {
                 const sentence = shuffled[i];
-                const cardKey = `${word}_${sentence.id}`;
+                const cardKey = `${mId}_${sentence.id}`;
 
                 this.mainQueue.push({
                     cardKey,
                     word,
+                    meaningId: mId,
                     sentence,
                     usedSentenceIds: new Set([sentence.id])
                 });
@@ -123,14 +126,14 @@ class SessionManager {
                 } else {
                     // One correct, need one more confirmation
                     result.isDone = false;
-                    this.scheduleRetry(cardKey, word, state);
+                    this.scheduleRetry(cardKey, word, state, card.meaningId);
                 }
             }
         } else {
             this.stats.incorrect++;
             state.needsConfirmation = true;
             state.consecutiveCorrect = 0;
-            this.scheduleRetry(cardKey, word, state);
+            this.scheduleRetry(cardKey, word, state, card.meaningId);
         }
 
         return result;
@@ -139,10 +142,10 @@ class SessionManager {
     skipToDifferentSentence() {
         if (!this.currentCard) return false;
         
-        const word = this.currentCard.word;
+        const mId = this.currentCard.meaningId;
         const cardKey = this.currentCard.cardKey;
         const state = this.wordState.get(cardKey);
-        const sentences = this.wordSentences.get(word) || [];
+        const sentences = this.meaningSentences.get(mId) || [];
         
         // Find unused sentences
         const unused = sentences.filter(s => !state.usedSentenceIds.has(s.id));
@@ -165,8 +168,8 @@ class SessionManager {
         return true;
     }
 
-    scheduleRetry(cardKey, word, state) {
-        const sentences = this.wordSentences.get(word) || [];
+    scheduleRetry(cardKey, word, state, mId) {
+        const sentences = this.meaningSentences.get(mId) || [];
         const unused = sentences.filter(s => !state.usedSentenceIds.has(s.id));
 
         let nextSentence;
@@ -224,26 +227,28 @@ class SessionManager {
 }
 
 class ReadingSessionManager {
-    constructor(wordSentencesMap, sentencesPerWord) {
+    constructor(meaningSentencesMap, sentencesPerMeaning) {
         this.mainQueue = [];
         this.position = 0;
         this.stats = { total: 0, correct: 0, incorrect: 0 };
         
-        for (const [word, sentences] of wordSentencesMap) {
+        for (const [mId, sentences] of meaningSentencesMap) {
             if (sentences.length === 0) continue;
+            const word = sentences[0].word;
             
-            // shuffle the sentences for this word
+            // shuffle the sentences for this meaning
             const shuffled = [...sentences];
             for (let i = shuffled.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
             }
             
-            // take up to specified sentencesPerWord
-            const toTake = Math.min(sentencesPerWord, shuffled.length);
+            // take up to specified sentencesPerMeaning
+            const toTake = Math.min(sentencesPerMeaning, shuffled.length);
             for(let i = 0; i < toTake; i++) {
                 this.mainQueue.push({
                     word,
+                    meaningId: mId,
                     sentence: shuffled[i]
                 });
             }
@@ -281,15 +286,14 @@ class ReadingSessionManager {
 }
 
 class WarmUpSessionManager {
-    constructor(wordSentencesMap, repeatCount) {
+    constructor(meaningSentencesMap, repeatCount) {
         this.mainQueue = [];
         this.position = 0;
         this.stats = { total: 0, correct: 0, incorrect: 0 };
         
-        for (const [word, sentences] of wordSentencesMap) {
-            // Even if there are no sentences, we could still technically show the word,
-            // but for meanings we need sentences.turkish.
+        for (const [mId, sentences] of meaningSentencesMap) {
             if (sentences.length === 0) continue;
+            const word = sentences[0].word;
             
             // For warm up, we'll queue the item 'repeatCount' times.
             for (let i = 0; i < repeatCount; i++) {
@@ -300,6 +304,7 @@ class WarmUpSessionManager {
 
                 this.mainQueue.push({
                     word: word,
+                    meaningId: mId,
                     meanings: [...new Set(meanings)] // ensure unique meanings just in case
                 });
             }
@@ -338,18 +343,20 @@ class WarmUpSessionManager {
 }
 
 class SpeakingSessionManager {
-    constructor(wordList, wordSentences) {
-        this.wordList = [...wordList];
-        this.wordSentences = wordSentences;
+    constructor(meaningList, meaningSentencesMap) {
+        this.meaningList = [...meaningList];
+        this.meaningSentences = meaningSentencesMap;
         this.mainQueue = [];
         this.position = 0;
         this.stats = { total: 0, correct: 0, incorrect: 0 };
         this.currentCards = null;
 
         // Build queue
-        for (const word of this.wordList) {
-            const sentences = this.wordSentences.get(word) || [];
+        for (const mId of this.meaningList) {
+            const sentences = this.meaningSentences.get(mId) || [];
             if (sentences.length === 0) continue;
+            const word = sentences[0].word;
+            const englishDefinition = sentences[0].englishDefinition;
             
             const shuffledSentences = [...sentences].sort(() => 0.5 - Math.random());
             const selectedSentences = shuffledSentences.slice(0, 3);
@@ -357,6 +364,8 @@ class SpeakingSessionManager {
 
             this.mainQueue.push({
                 word: word,
+                meaningId: mId,
+                englishDefinition: englishDefinition || "Anlam bulunamadı.",
                 meanings: [...new Set(meanings)]
             });
         }
