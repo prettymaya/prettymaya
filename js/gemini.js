@@ -37,7 +37,8 @@ STRICT RULES:
 3. Sentences must sound completely native and natural — like something a native English speaker would actually say in real life.
 4. Difficulty: medium (everyday conversational to light academic).
 5. Length: medium (8-16 words per sentence).
-6. Replace the target word (or its grammatically modified form) with "___" (three underscores).
+6. Replace the target word (or its grammatically modified form) with "___" (three underscores). 
+   - CRITICAL DICTATE: If the target vocabulary is a MULTI-WORD expression, phrasal verb, or idiom (e.g., "carve out", "habit stacking", "put up with"), you MUST replace the ENTIRE expression as a single block of "___". Do NOT leave parts of the expression visible (e.g., replacing only "carve" and leaving "out"). The \`answer\` field MUST contain the full exact phrase you removed.
 7. The word may appear in different grammatical forms (e.g., "leave" → "left", "leaving", "leaves" OR "act" → "acting", "action", "active").
 8. Each sentence MUST use a DIFFERENT meaning, context, or grammatical role of the word.
 9. Turkish translations must be natural and fluent — not word-by-word translations. Capture the exact nuanced meaning the word has in that specific sentence.
