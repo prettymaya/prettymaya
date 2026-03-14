@@ -29,25 +29,36 @@ const GeminiService = {
     },
 
     buildPrompt(word, count = 10) {
-        return `You are an expert English teacher creating vocabulary active recall exercises. Generate exactly ${count} fill-in-the-blank sentences for the English word "${word}".
+        return `You are an expert English teacher creating active-recall vocabulary exercises.
 
-STRICT RULES:
-1. REQUIRED DIVERSITY: You MUST use the word in its MOST COMMON grammatical forms and meanings (e.g., as a noun, verb, adjective, adverb) based on how native speakers actually use it. Do NOT just use it as a verb. If a word is both a noun and a verb, provide sentences for BOTH cases.
-2. Sentences MUST provide strong, clear context clues. The user should be able to guess the target word based on the rich context of the sentence alone.
-3. Sentences must sound completely native and natural — like something a native English speaker would actually say in real life.
-4. Difficulty: medium (everyday conversational to light academic).
-5. Length: medium (8-16 words per sentence).
-6. Replace the target word (or its grammatically modified form) with "___" (three underscores). 
-   - CRITICAL DICTATE FOR PHRASAL VERBS: If the target vocabulary is a MULTI-WORD expression (e.g., "carve out", "put up with"), you MUST remove the ENTIRE expression from the sentence and replace it with a SINGLE "___". 
-   - DO NOT leave any part of the expression behind. For example, if the word is "carve out", you MUST write "She ___ a niche" (where answer="carved out"). Do NOT write "She ___ out a niche".
-   - The \`answer\` field MUST contain the full exact phrase you removed.
-7. The word may appear in different grammatical forms (e.g., "leave" → "left", "leaving", "leaves" OR "act" → "acting", "action", "active").
-   - EXTREMELY IMPORTANT: The \`answer\` MUST ALWAYS be the exact target phrase "${word}" or a direct grammatical derivation of it. NEVER use a synonym (like using "rid" when the target is "vice").
-8. Each sentence MUST provide a DIFFERENT context. You may reuse meanings if the word doesn't have enough distinct meanings to fulfill the count, but the contexts/sentences must be different.
-9. Turkish translations must be natural and fluent — not word-by-word translations. Capture the exact nuanced meaning the word has in that specific sentence.
-10. The "hint" field should contain the exact Turkish meaning of the word form used in that specific sentence (e.g. if used as a noun, give noun meaning; if verb, give verb meaning).
+Task: Generate exactly ${count} fill-in-the-blank sentences for the word "${word}".
 
-Return ONLY a valid JSON array with exactly ${count} objects in this format:
+Rules:
+* Use the word in its most common grammatical forms and meanings (noun, verb, adjective, etc.). If both noun and verb exist, include both.
+* Sentences must sound natural and contain strong context clues.
+* Length: 8-16 words.
+* Difficulty: medium (daily conversation to light academic).
+* Replace the target word (or its form) with "___".
+
+Phrasal verbs:
+If the word is a multi-word expression (e.g., "put up with", "carve out"):
+* Remove the entire phrase and replace it with ONE "___".
+* Do not leave any part of the phrase in the sentence.
+* The \`answer\` must contain the full phrase.
+
+Answer rules:
+* \`answer\` must be EXACTLY "${word}" or a direct grammatical form of it (e.g., leave -> leaving / acted).
+* Never use synonyms (e.g., if target is "vice", do not use "rid").
+
+Context:
+* Each sentence must use a different context.
+
+Turkish:
+* \`turkish\` must be a natural, non-robotic translation of the sentence.
+* \`hint\` must be the Turkish meaning of the word form used in that specific sentence.
+
+Return ONLY a valid JSON array with exactly ${count} objects.
+Example:
 [
   {
     "sentence": "She ___ the door open for the guests.",
@@ -57,7 +68,7 @@ Return ONLY a valid JSON array with exactly ${count} objects in this format:
   }
 ]
 
-IMPORTANT: Return ONLY the JSON array. No explanations, no markdown, no code blocks.`;
+IMPORTANT: Return ONLY the JSON array.`;
     },
 
     async generateSentences(word, count = 10, onProgress = null) {
