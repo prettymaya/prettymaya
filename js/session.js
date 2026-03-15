@@ -187,6 +187,7 @@ class SessionManager {
             card: {
                 cardKey,
                 word,
+                meaningId: mId,
                 sentence: nextSentence,
                 usedSentenceIds: state.usedSentenceIds
             },

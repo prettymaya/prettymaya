@@ -1715,11 +1715,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function handleCheck() {
         const inputStr = els.fcInput.value.trim();
-        if (!inputStr) {
-            els.fcInput.classList.add('shake');
-            setTimeout(() => els.fcInput.classList.remove('shake'), 400);
-            return;
-        }
 
         const isCorrect = currentSession.checkAnswer(inputStr);
         const result = currentSession.handleAnswer(isCorrect);
