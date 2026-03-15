@@ -320,16 +320,26 @@ const DB = {
     // ─── Import / Export ─────────────────────────────────────
     async exportAll() {
         const words = await this.getAllWords();
-        const tx = this.db.transaction('sentences', 'readonly');
-        const sentenceStore = tx.objectStore('sentences');
+        
+        const txS = this.db.transaction('sentences', 'readonly');
+        const sentenceStore = txS.objectStore('sentences');
         const sentences = await new Promise((res, rej) => {
             const req = sentenceStore.getAll();
             req.onsuccess = () => res(req.result);
             req.onerror = () => rej(req.error);
         });
+
+        const txM = this.db.transaction('meanings', 'readonly');
+        const meaningStore = txM.objectStore('meanings');
+        const meanings = await new Promise((res, rej) => {
+            const req = meaningStore.getAll();
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+        });
+
         const history = await this.getSessionHistory();
 
-        return { words, sentences, history, exportDate: new Date().toISOString() };
+        return { words, sentences, meanings, history, exportDate: new Date().toISOString() };
     },
 
     async importAll(data) {
@@ -337,30 +347,27 @@ const DB = {
         await this.deleteAllWords();
 
         // Import words
-        if (data.words) {
+        if (data.words && data.words.length > 0) {
             const tx = this.db.transaction('words', 'readwrite');
             const store = tx.objectStore('words');
-            for (const w of data.words) {
-                store.add(w);
-            }
-            await new Promise((res, rej) => {
-                tx.oncomplete = () => res();
-                tx.onerror = () => rej(tx.error);
-            });
+            for (const w of data.words) store.add(w);
+            await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+        }
+
+        // Import meanings (Must preserve IDs so sentences can map meaningId correctly!)
+        if (data.meanings && data.meanings.length > 0) {
+            const tx = this.db.transaction('meanings', 'readwrite');
+            const store = tx.objectStore('meanings');
+            for (const m of data.meanings) store.add(m); // Keep explicit id 
+            await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
         }
 
         // Import sentences
-        if (data.sentences) {
+        if (data.sentences && data.sentences.length > 0) {
             const tx = this.db.transaction('sentences', 'readwrite');
             const store = tx.objectStore('sentences');
-            for (const s of data.sentences) {
-                const { id, ...rest } = s; // Remove old id
-                store.add(rest);
-            }
-            await new Promise((res, rej) => {
-                tx.oncomplete = () => res();
-                tx.onerror = () => rej(tx.error);
-            });
+            for (const s of data.sentences) store.add(s); // Keep explicit id
+            await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
         }
     }
 };
