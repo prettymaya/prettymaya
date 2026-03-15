@@ -783,10 +783,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 els.btnGenMissing.innerHTML = `<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span> Üretiliyor: ${w.word} (${i+1}/${missing.length})`;
                 
                 try {
-                    // 1. Fetch deep dictionary definitions (if the word was added cleanly before without them)
-                    const dictData = await DictionaryService.fetchWord(w.word);
-                    const addedMeaningIds = await DB.addMeanings(w.word, dictData.meanings);
-                    dictData.meanings.forEach((m, idx) => m.id = addedMeaningIds[idx]);
+                    // 1. Check if we already have meanings in DB to avoid API spam
+                    let existingMeanings = await DB.getMeaningsForWord(w.word);
+                    let dictData = { word: w.word, meanings: existingMeanings };
+                    
+                    if (existingMeanings.length === 0) {
+                        // Fallback: Fetch deep dictionary definitions if literally 0 meanings exist
+                        dictData = await DictionaryService.fetchWord(w.word);
+                        const addedMeaningIds = await DB.addMeanings(w.word, dictData.meanings);
+                        dictData.meanings.forEach((m, idx) => m.id = addedMeaningIds[idx]);
+                    }
                     
                     // 2. Generate 3 sentences via Gemini
                     await startDictionaryTranslationProcess([dictData], 3); // Await the generation so it finishes before the timeout
@@ -844,9 +850,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     btnGenerateAll.innerHTML = `<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span> Üretiliyor: ${w.word} (${i+1}/${wordsToProcess.length})`;
                     
                     try {
-                        const dictData = await DictionaryService.fetchWord(w.word);
-                        const addedMeaningIds = await DB.addMeanings(w.word, dictData.meanings);
-                        dictData.meanings.forEach((m, idx) => m.id = addedMeaningIds[idx]);
+                        let existingMeanings = await DB.getMeaningsForWord(w.word);
+                        let dictData = { word: w.word, meanings: existingMeanings };
+                        
+                        if (existingMeanings.length === 0) {
+                            dictData = await DictionaryService.fetchWord(w.word);
+                            const addedMeaningIds = await DB.addMeanings(w.word, dictData.meanings);
+                            dictData.meanings.forEach((m, idx) => m.id = addedMeaningIds[idx]);
+                        }
                         
                         await startDictionaryTranslationProcess([dictData], 3); 
                         
@@ -875,6 +886,92 @@ document.addEventListener('DOMContentLoaded', async () => {
                 els.btnGenMissing.disabled = false;
                 btnGenerateAll.innerHTML = '<i class="fa-solid fa-bolt"></i> Tümüne Üret';
             }
+        });
+    }
+    
+    // Cleanup Empty Meanings
+    const btnCleanupMeanings = document.getElementById('btn-cleanup-meanings');
+    if (btnCleanupMeanings) {
+        btnCleanupMeanings.addEventListener('click', async () => {
+             if (!confirm('Veritabanındaki cümlesi olmayan (boş) Tektip anlamlar kalıcı olarak silinecek. Ayrıca aynı anlama sahip kelimeler birleştirilecek. Bu işlem geri alınamaz. Onaylıyor musunuz?')) return;
+             
+             btnCleanupMeanings.disabled = true;
+             const originalText = btnCleanupMeanings.innerHTML;
+             btnCleanupMeanings.innerHTML = '<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span> Temizleniyor...';
+             
+             try {
+                 let deletedCount = 0;
+                 let mergedCount = 0;
+                 
+                 // Get all meanings and all sentences to cross-reference
+                 const allMeanings = await DB.getAllMeanings();
+                 const allSentences = await DB.getAllSentences();
+                 
+                 // Index sentences by meaningId
+                 const sentenceCountsByMeaning = {};
+                 const sentencesByMeaning = {};
+                 allSentences.forEach(s => {
+                     if (s.meaningId) {
+                         sentenceCountsByMeaning[s.meaningId] = (sentenceCountsByMeaning[s.meaningId] || 0) + 1;
+                         if (!sentencesByMeaning[s.meaningId]) sentencesByMeaning[s.meaningId] = [];
+                         sentencesByMeaning[s.meaningId].push(s);
+                     }
+                 });
+                 
+                 // 1. Delete Orphaned Meanings (0 Sentences)
+                 // Note: We might want to keep at least 1 meaning if the word has NO sentences at all, 
+                 // but the prompt asked to delete meanings *without sentences*. If a word loses all meanings, 
+                 // the fetch pipeline will recreate them anyway.
+                 for (const m of allMeanings) {
+                     if (!sentenceCountsByMeaning[m.id]) {
+                         await DB.deleteMeaning(m.id);
+                         deletedCount++;
+                     }
+                 }
+                 
+                 // 2. Deduplicate Identical Meanings that DO have sentences
+                 // Group surviving meanings by Word + Exact Text
+                 const survivingMeanings = await DB.getAllMeanings();
+                 const groupedMeanings = {};
+                 
+                 for (const m of survivingMeanings) {
+                     const key = `${m.word}::${m.definition.trim()}`;
+                     if (!groupedMeanings[key]) groupedMeanings[key] = [];
+                     groupedMeanings[key].push(m);
+                 }
+                 
+                 for (const key in groupedMeanings) {
+                     const duplicates = groupedMeanings[key];
+                     if (duplicates.length > 1) {
+                         // Found identical definitions for the same word. Keep the first one, delete the rest.
+                         const targetMeaning = duplicates[0];
+                         
+                         for (let i = 1; i < duplicates.length; i++) {
+                             const dupMeaning = duplicates[i];
+                             
+                             // Delete all sentences associated with this duplicate meaning
+                             const sentencesToDelete = sentencesByMeaning[dupMeaning.id] || [];
+                             for (const sm of sentencesToDelete) {
+                                 await DB.deleteSentenceById(sm.id);
+                             }
+                             
+                             // Delete the duplicate meaning itself
+                             await DB.deleteMeaning(dupMeaning.id);
+                             mergedCount++;
+                         }
+                     }
+                 }
+                 
+                 showToast(`${deletedCount} boş anlam silindi, ${mergedCount} kopya anlam cümlesiyle beraber silindi!`, 'success');
+                 await updateDashboard();
+                 renderWordList();
+             } catch(e) {
+                 console.error("Cleanup Error:", e);
+                 showToast('Temizleme sırasında hata: ' + e.message, 'error');
+             } finally {
+                 btnCleanupMeanings.disabled = false;
+                 btnCleanupMeanings.innerHTML = originalText;
+             }
         });
     }
 
