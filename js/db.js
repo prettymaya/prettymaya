@@ -261,6 +261,26 @@ const DB = {
         return addedIds;
     },
 
+    async deleteMeaning(id) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('meanings', 'readwrite');
+            const store = tx.objectStore('meanings');
+            const req = store.delete(Number(id));
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async getAllMeanings() {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('meanings', 'readonly');
+            const store = tx.objectStore('meanings');
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
     async getMeaningsForWord(word) {
         return new Promise((resolve, reject) => {
             const tx = this.db.transaction('meanings', 'readonly');
