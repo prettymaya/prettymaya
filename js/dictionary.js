@@ -27,6 +27,7 @@ const DictionaryService = {
     },
 
     async fetchWord(word) {
+        word = word.toLowerCase();
         try {
             // Tier 1: V1 API (Comprehensive Senses)
             const result = await this.fetchV1(word);
