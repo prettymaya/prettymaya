@@ -128,17 +128,30 @@ const DictionaryService = {
         data.entries.forEach(entry => {
             const partOfSpeech = entry.partOfSpeech || 'unknown';
             
-            if (entry.senses && Array.isArray(entry.senses)) {
-                entry.senses.forEach(sense => {
-                    if (sense.definition) {
-                        result.meanings.push({
-                            partOfSpeech: partOfSpeech,
-                            definition: sense.definition + " [v1]",
-                            example: null
-                        });
-                    }
-                });
-            }
+                if (entry.senses && Array.isArray(entry.senses)) {
+                    entry.senses.forEach(sense => {
+                        // Some words have definitions directly on the sense
+                        if (sense.definition) {
+                            result.meanings.push({
+                                partOfSpeech: partOfSpeech,
+                                definition: sense.definition + " [v1]",
+                                example: null
+                            });
+                        }
+                        // Others (like "financial", "finish") nest them inside "subsenses"
+                        if (sense.subsenses && Array.isArray(sense.subsenses)) {
+                            sense.subsenses.forEach(sub => {
+                                if (sub.definition) {
+                                    result.meanings.push({
+                                        partOfSpeech: partOfSpeech,
+                                        definition: sub.definition + " [v1]",
+                                        example: null
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
         });
         
         if (result.meanings.length === 0) {
