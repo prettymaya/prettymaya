@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Words
         wordListBody: document.getElementById('word-list-body'),
         searchInput: document.getElementById('input-search-words'),
+        btnConfirmAddSlow: document.getElementById('btn-confirm-add-slow'),
         btnShowAddModal: document.getElementById('btn-show-add-modal'),
         btnGenMissing: document.getElementById('btn-generate-missing'),
 
@@ -636,7 +637,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 300);
     });
 
-    els.btnConfirmAdd.addEventListener('click', async () => {
+    async function processWordList(isSlowMode) {
         const text = els.inputWordList.value;
         const list = text.split('\n').map(w => w.trim()).filter(w => w.length > 0);
         
@@ -645,57 +646,67 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        const activeBtn = isSlowMode ? els.btnConfirmAddSlow : els.btnConfirmAdd;
+        const originalText = activeBtn.innerHTML;
+
         els.btnConfirmAdd.disabled = true;
-        els.btnConfirmAdd.innerHTML = '<span class="spinner" style="width:16px;height:16px;"></span> Ekleniyor...';
+        els.btnConfirmAddSlow.disabled = true;
 
         try {
             // Stage 1: Fast Dictionary Lookup & Word Addition
             const parsedWordsData = [];
             const results = { added: [], existing: [], failed: [] };
 
-            for (const dictWord of list) {
+            for (let i = 0; i < list.length; i++) {
+                const dictWord = list[i];
+                activeBtn.innerHTML = `<span class="spinner" style="width:16px;height:16px;"></span> İşleniyor: ${dictWord}...`;
+                
                 try {
                     // Check if already exists fast using the loaded words list
                     const exists = allWords.some(w => w.word === dictWord.toLowerCase());
                     if (exists) {
                         results.existing.push(dictWord);
-                        continue;
+                    } else {
+                        // Fetch from Dictionary API
+                        const dictData = await DictionaryService.fetchWord(dictWord);
+                        parsedWordsData.push(dictData);
+                        results.added.push(dictData.word.toLowerCase());
+
+                        // Save word & audio to DB immediately
+                        await DB.addWords([{ word: dictData.word, audio: dictData.audio }]);
+                        
+                        // Save basic meanings instantly
+                        const addedMeaningIds = await DB.addMeanings(dictData.word.toLowerCase(), dictData.meanings);
+                        // Attach the new DB IDs back to the meaning objects for the Gemini stage
+                        dictData.meanings.forEach((m, index) => m.id = addedMeaningIds[index]);
                     }
 
-                    // Fetch from Dictionary API
-                    const dictData = await DictionaryService.fetchWord(dictWord);
-                    parsedWordsData.push(dictData);
+                    // Slow Mode Throttling Logic (Avoid API limits for Free Dictionary API)
+                    if (isSlowMode && i < list.length - 1 && !exists) {
+                        activeBtn.innerHTML = `<span class="spinner" style="width:16px;height:16px;"></span> 10s bekleniyor...`;
+                        await new Promise(r => setTimeout(r, 10000));
+                    }
+                    
                 } catch (e) {
                     console.error("Dictionary Fetch Error:", e);
                     results.failed.push(dictWord);
+                    if (isSlowMode && i < list.length - 1) {
+                         activeBtn.innerHTML = `<span class="spinner" style="width:16px;height:16px;"></span> Hata sonrası 10s bekleniyor...`;
+                         await new Promise(r => setTimeout(r, 10000));
+                    }
                 }
             }
 
-            // Add Words with Audio data
-            const dbWordObjects = parsedWordsData.map(d => ({ word: d.word, audio: d.audio }));
-            const addResult = await DB.addWords(dbWordObjects);
-            results.added = addResult.added;
-
-            // Save basic meanings instantly
-            for (const d of parsedWordsData) {
-                if (results.added.includes(d.word.toLowerCase())) {
-                    const addedMeaningIds = await DB.addMeanings(d.word.toLowerCase(), d.meanings);
-                    // Attach the new DB IDs back to the meaning objects for the Gemini stage
-                    d.meanings.forEach((m, index) => m.id = addedMeaningIds[index]);
-                }
-            }
-            
             els.modalAddWords.classList.remove('visible');
             
-            let message = `${results.added.length} kelime sözlükten çekildi.`;
+            let message = `${results.added.length} kelime başarıyla eklendi.`;
             if (results.existing.length > 0) message += ` ${results.existing.length} zaten vardı.`;
             if (results.failed.length > 0) message += ` ${results.failed.length} kelime bulunamadı.`;
             showToast(message, results.failed.length > 0 ? 'info' : 'success');
 
             // Stage 2: Automatic Background Translation (if checked)
             if (els.checkAutoGen.checked && parsedWordsData.length > 0) {
-                // We only process words that actually got added newly
-                const novelWordsData = parsedWordsData.filter(d => results.added.includes(d.word.toLowerCase()));
+                const novelWordsData = parsedWordsData; 
                 if (novelWordsData.length > 0) {
                     const countToGenerate = list.length < 10 ? 3 : 1;
                     startDictionaryTranslationProcess(novelWordsData, countToGenerate);
@@ -709,9 +720,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             showToast('Toplu ekleme hatası: ' + e.message, 'error');
         } finally {
             els.btnConfirmAdd.disabled = false;
-            els.btnConfirmAdd.innerHTML = 'Kelimeleri Ekle';
+            els.btnConfirmAddSlow.disabled = false;
+            activeBtn.innerHTML = originalText;
+            els.inputWordList.value = '';
         }
-    });
+    }
+
+    els.btnConfirmAdd.addEventListener('click', () => processWordList(false));
+    els.btnConfirmAddSlow.addEventListener('click', () => processWordList(true));
 
     // ─── Dictionary & AI Pipeline ───────────────────────────
     els.btnGenMissing.addEventListener('click', async () => {

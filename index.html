@@ -550,9 +550,12 @@
                     <label for="check-auto-generate">Eklendikten sonra eksik cümleleri otomatik üret (API Anahtarı gerektirir)</label>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="flex-wrap: wrap; gap: 8px; justify-content: flex-end;">
                 <button class="btn btn-secondary" id="btn-cancel-add">İptal</button>
-                <button class="btn btn-primary" id="btn-confirm-add">Kelimeleri Ekle</button>
+                <button class="btn btn-secondary" id="btn-confirm-add-slow" style="color:var(--warning); border-color:rgba(245,158,11,0.3);" title="API kotalarına takılmamak için kelimeleri 10 saniye aralıklarla teker teker işler.">
+                    <i class="fa-solid fa-hourglass-half"></i> Yavaş Ekle (10s Aralık)
+                </button>
+                <button class="btn btn-primary" id="btn-confirm-add">Hızlı Ekle</button>
             </div>
         </div>
     </div>
