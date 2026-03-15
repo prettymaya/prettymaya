@@ -115,6 +115,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         readingSentence: document.getElementById('reading-sentence'),
         readingTurkish: document.getElementById('reading-turkish'),
         readingHint: document.getElementById('reading-hint'),
+        readingEnglishDef: document.getElementById('reading-english-def'),
+        readingEnglishText: document.getElementById('reading-english-text'),
         btnReadingNext: document.getElementById('btn-reading-next'),
         btnQuitSession: document.getElementById('btn-quit-session'),
         
@@ -1046,12 +1048,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             await DB.addWords(list);
             await updateDashboard();
 
-            sentenceCounts = await DB.getAllSentenceCounts();
-            const missing = list.filter(w => (sentenceCounts[w] || 0) < minSentencesRequired);
+            // Check if any word has ZERO sentences (we only require 1 now to start)
+            const missing = list.filter(w => (sentenceCounts[w] || 0) < 1);
 
             if (missing.length > 0) {
                 els.modalCustomPractice.classList.remove('visible');
                 showToast(`${missing.length} kelime için eksik cümleler üretiliyor...`, 'info');
+                // Request generation, but default to 1 sentence minimally required to get started quickly
                 await generateAndStartCustomSession(missing, list);
             } else {
                 els.modalCustomPractice.classList.remove('visible');
@@ -1080,6 +1083,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnCancelGen.textContent = 'İptal Et';
 
         try {
+            // we request minSentencesRequired from generator, but since Custom Practice needs fast entry, we just use the global setting
             await GeminiService.generateForMissingWords(missingWords, minSentencesRequired, (processed, total, word, status) => {
                 let perc = Math.round((processed / total) * 100);
                 els.genCurrentNum.textContent = processed;
@@ -1109,33 +1113,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function startSessionWithSpecificList(customList) {
-        const readyWordsMap = new Map();
+        const readyMeaningsMap = new Map();
+        
         for (const word of customList) {
-            const count = sentenceCounts[word] || 0;
-            if (count > 0) {
-                const sentences = await DB.getSentencesForWord(word);
-                readyWordsMap.set(word, sentences);
+            const sentences = await DB.getSentencesForWord(word);
+            if (sentences && sentences.length > 0) {
+                const wordMeanings = await DB.getMeaningsForWord(word);
+                const meaningGroups = {};
+                
+                sentences.forEach(s => {
+                    const mId = s.meaningId;
+                    if (!mId) return;
+                    if (!meaningGroups[mId]) meaningGroups[mId] = [];
+                    
+                    const meaningData = wordMeanings.find(m => m.id == mId);
+                    s.englishDefinition = meaningData ? meaningData.definition : "Anlam bulunamadı";
+                    
+                    meaningGroups[mId].push(s);
+                });
+                
+                // Only include meanings that have at least 1 sentence
+                for (const [mId, sList] of Object.entries(meaningGroups)) {
+                    if (sList.length >= 1) {
+                        readyMeaningsMap.set(mId, sList);
+                    }
+                }
             }
         }
 
-        if (readyWordsMap.size === 0) {
+        if (readyMeaningsMap.size === 0) {
             showToast(`Bu kelimeler için yeterli cümle bulunamadı.`, 'error');
             return;
         }
 
         if (practiceMode === 'reading') {
             const c = parseInt(els.selectReadingCount.value);
-            currentSession = new ReadingSessionManager(readyWordsMap, c);
+            currentSession = new ReadingSessionManager(readyMeaningsMap, c);
         } else if (practiceMode === 'mixed') {
             const c = parseInt(els.selectReadingCount.value);
-            currentSession = new SessionManager(readyWordsMap, c);
+            currentSession = new SessionManager(readyMeaningsMap, c);
         } else if (practiceMode === 'warmup') {
             const c = parseInt(els.selectReadingCount.value);
-            currentSession = new WarmUpSessionManager(readyWordsMap, c);
+            currentSession = new WarmUpSessionManager(readyMeaningsMap, c);
         } else if (practiceMode === 'speaking') {
-            currentSession = new SpeakingSessionManager([...readyWordsMap.keys()], readyWordsMap);
+            currentSession = new SpeakingSessionManager([...readyMeaningsMap.keys()], readyMeaningsMap);
         } else {
-            currentSession = new SessionManager(readyWordsMap, 1);
+            currentSession = new SessionManager(readyMeaningsMap, 1);
         }
         
         resetGamification();
@@ -1491,6 +1514,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.readingTurkish.textContent = card.sentence.turkish;
             els.readingHint.textContent = card.sentence.hint;
             
+            // Show English Definition
+            if (card.sentence.englishDefinition) {
+                els.readingEnglishText.textContent = card.sentence.englishDefinition;
+                els.readingEnglishDef.style.display = 'block';
+            } else {
+                els.readingEnglishDef.style.display = 'none';
+            }
+            
             // Populate Comparison inline badge
             els.readingCompareOriginal.textContent = card.word;
             els.readingCompareAnswer.textContent = card.sentence.answer;
@@ -1511,10 +1542,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (els.speakingWordsContainer) {
                 els.speakingWordsContainer.innerHTML = '';
                 
-                // card is actually an array of up to 3 cards for speaking mode
+                // Switch to Flexbox so the 4th item can span full/center on the second row
+                els.speakingWordsContainer.style.display = 'flex';
+                els.speakingWordsContainer.style.flexWrap = 'wrap';
+                els.speakingWordsContainer.style.justifyContent = 'center';
+                
+                // card is actually an array of up to 4 cards for speaking mode
                 card.forEach((c, index) => {
+                    // Check if it's the 4th item in a 4-item array
+                    const isLastOfFour = (index === 3 && card.length === 4);
+                    // On desktop, 1/3 width minus gap for first 3. Full or half width centered for 4th.
+                    // Using basic flexbasis to scale down on mobile automatically
+                    const flexStyle = isLastOfFour ? 'flex: 0 0 100%; max-width: 400px; margin-top: 10px;' : 'flex: 1 1 250px; max-width: 350px;';
+
                     const cardHtml = `
-                        <div style="background: var(--bg-glass); border-radius: 16px; padding: 24px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="background: var(--bg-glass); border-radius: 16px; padding: 24px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; ${flexStyle}">
                             <div>
                                 <h3 style="color: var(--warning); font-size: 2.2rem; font-weight: 800; margin-bottom: 16px; text-transform: lowercase;">${c.word}</h3>
                                 <button class="btn btn-ghost btn-sm btn-show-hint-speaking" data-index="${index}" style="margin-bottom: 12px; font-size: 0.85rem; color: var(--text-muted);"><i class="fa-solid fa-eye"></i> İpucu Göster</button>
