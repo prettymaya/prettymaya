@@ -29,10 +29,12 @@ const GeminiService = {
     },
 
     buildPrompt(word, meaningsToProcess, generateCount) {
+        const totalSentences = meaningsToProcess.length * generateCount;
         return `You are an expert English-Turkish vocabulary curriculum designer.
         
 Task: You are given a JSON list of dictionary definitions (meanings) for the target word/phrase: "${word}".
 Your job is to generate exactly ${generateCount} natural, medium-difficulty (B1-B2 level) example sentences for EACH provided meaning.
+Since there are ${meaningsToProcess.length} meanings provided, you MUST output a TOTAL of exactly ${totalSentences} sentences in your final JSON array. Do not cut corners or combine them.
 
 STRICT INSTRUCTIONS:
 1. Generate natural, conversational English sentences that clearly demonstrate the specific meaning. 
