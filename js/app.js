@@ -776,26 +776,46 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         els.btnGenMissing.disabled = true;
-        els.btnGenMissing.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
         
         try {
-            const parsedWordsData = [];
-            for(const w of missing) {
+            for(let i = 0; i < missing.length; i++) {
+                const w = missing[i];
+                els.btnGenMissing.innerHTML = `<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span> Üretiliyor: ${w.word} (${i+1}/${missing.length})`;
+                
                 try {
+                    // 1. Fetch deep dictionary definitions (if the word was added cleanly before without them)
                     const dictData = await DictionaryService.fetchWord(w.word);
                     const addedMeaningIds = await DB.addMeanings(w.word, dictData.meanings);
                     dictData.meanings.forEach((m, idx) => m.id = addedMeaningIds[idx]);
-                    parsedWordsData.push(dictData);
-                } catch(e) { console.error('Dictionary API error for ' + w.word, e); }
+                    
+                    // 2. Generate 3 sentences via Gemini
+                    await startDictionaryTranslationProcess([dictData], 3); // Await the generation so it finishes before the timeout
+                    
+                    // 3. User requested 2-second rate limit delay between words
+                    if (i < missing.length - 1) {
+                         els.btnGenMissing.innerHTML = `<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span> 2s bekleniyor... (${i+1}/${missing.length})`;
+                         await new Promise(r => setTimeout(r, 2000));
+                    }
+                    
+                } catch(e) {
+                    console.error(`Error generating for ${w.word}:`, e);
+                    // On error, let's still wait 2 seconds before hammering the API with the next word
+                    if (i < missing.length - 1) {
+                         els.btnGenMissing.innerHTML = `<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span> Hata (2s bekleme) (${i+1}/${missing.length})`;
+                         await new Promise(r => setTimeout(r, 2000));
+                    }
+                }
             }
-            if(parsedWordsData.length > 0) {
-                startDictionaryTranslationProcess(parsedWordsData);
-            } else {
-                showToast("Sözlükten kelime çekilemedi.", "error");
-            }
+            
+            showToast("Eksik cümleler başarıyla üretildi!", "success");
+            await updateDashboard();
+            renderWordList();
+            
+        } catch(e) {
+            showToast("Üretim sırasında hata: " + e.message, "error");
         } finally {
             els.btnGenMissing.disabled = false;
-            els.btnGenMissing.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Eksik Cümleleri Üret';
+            els.btnGenMissing.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Eksikleri Üret';
         }
     });
 
