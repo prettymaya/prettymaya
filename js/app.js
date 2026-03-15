@@ -1336,16 +1336,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 meaningGroups[mId].push(s);
             });
 
-            // Only include meanings that have enough sentences
+            // Only include meanings that have at least 1 sentence
             for (const [mId, sList] of Object.entries(meaningGroups)) {
-                if (sList.length >= minSentencesRequired) {
+                if (sList.length >= 1) {
                     readyMeaningsMap.set(mId, sList);
                 }
             }
         }
 
         if (readyMeaningsMap.size === 0) {
-            showToast(`Pratik yapmak için en az ${minSentencesRequired} cümlesi olan kelime veya anlama ihtiyacınız var. Kelimeler sekmesinden "Eksikleri Üret" butonuna basın.`, 'error');
+            showToast(`Pratik yapmak için cümlesi olan hiçbir kelime bulunamadı. Lütfen önce "Eksikleri Üret" butonunu kullanın.`, 'error');
             return;
         }
 
