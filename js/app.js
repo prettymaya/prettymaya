@@ -818,6 +818,65 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.btnGenMissing.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Eksikleri Üret';
         }
     });
+    
+    // Generate For ALL words
+    const btnGenerateAll = document.getElementById('btn-generate-all');
+    if (btnGenerateAll) {
+        btnGenerateAll.addEventListener('click', async () => {
+            // Filter out words that have 0 sentences
+            const wordsToProcess = allWords.filter(w => (sentenceCounts[w.word] || 0) > 0);
+            
+            if (wordsToProcess.length === 0) {
+                showToast('İşlenecek kelime yok (hepsi 0 cümleli)!', 'info');
+                return;
+            }
+
+            if (!confirm(`0 cümleli kelimeler HARİÇ toplam (${wordsToProcess.length} kelime) sırayla 3'er cümle üretilecek. Her kelime arasında 2 saniye dinlenme payı olacak. Bu işlem uzun sürebilir. Onaylıyor musun?`)) {
+                return;
+            }
+
+            btnGenerateAll.disabled = true;
+            els.btnGenMissing.disabled = true; // Disable the other one too to avoid conflicts
+            
+            try {
+                for(let i = 0; i < wordsToProcess.length; i++) {
+                    const w = wordsToProcess[i];
+                    btnGenerateAll.innerHTML = `<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span> Üretiliyor: ${w.word} (${i+1}/${wordsToProcess.length})`;
+                    
+                    try {
+                        const dictData = await DictionaryService.fetchWord(w.word);
+                        const addedMeaningIds = await DB.addMeanings(w.word, dictData.meanings);
+                        dictData.meanings.forEach((m, idx) => m.id = addedMeaningIds[idx]);
+                        
+                        await startDictionaryTranslationProcess([dictData], 3); 
+                        
+                        if (i < wordsToProcess.length - 1) {
+                             btnGenerateAll.innerHTML = `<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span> 2s bekleniyor... (${i+1}/${wordsToProcess.length})`;
+                             await new Promise(r => setTimeout(r, 2000));
+                        }
+                        
+                    } catch(e) {
+                        console.error(`Error generating for ${w.word}:`, e);
+                        if (i < wordsToProcess.length - 1) {
+                             btnGenerateAll.innerHTML = `<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span> Hata (2s bekleme) (${i+1}/${wordsToProcess.length})`;
+                             await new Promise(r => setTimeout(r, 2000));
+                        }
+                    }
+                }
+                
+                showToast("Tüm kelimelere cümle üretimi tamamlandı!", "success");
+                await updateDashboard();
+                renderWordList();
+                
+            } catch(e) {
+                showToast("Üretim sırasında hata: " + e.message, "error");
+            } finally {
+                btnGenerateAll.disabled = false;
+                els.btnGenMissing.disabled = false;
+                btnGenerateAll.innerHTML = '<i class="fa-solid fa-bolt"></i> Tümüne Üret';
+            }
+        });
+    }
 
     els.btnCancelGen.addEventListener('click', () => {
         cancelGeneration = true;

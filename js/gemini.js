@@ -179,7 +179,8 @@ Example output:
                 .filter(i => typeof i === 'number' && i >= 0 && i < meanings.length)
                 .map(i => meanings[i]);
                 
-            return selected.length > 0 ? selected : meanings.slice(0, maxKeep);
+            // Brutal enforcement of maxKeep in case the AI ignores the prompt
+            return selected.length > 0 ? selected.slice(0, maxKeep) : meanings.slice(0, maxKeep);
         } catch (e) {
             console.warn("Failed to parse AI meaning filter response, falling back to slice:", textResponse);
             return meanings.slice(0, maxKeep);
