@@ -166,6 +166,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ─── State ──────────────────────────────────────────────
     let allWords = [];
     let sentenceCounts = {};
+    let sessionSentencesOriginal = []; // Backup of original order
+    
+    // Sort states: 'date_desc' (default), 'count_asc', 'count_desc'
+    let currentTableSort = 'date_desc';
     let minSentencesRequired = 2;
     let cancelGeneration = false;
     let currentSession = null;
@@ -549,12 +553,45 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // ─── Word Management ────────────────────────────────────
+    
+    // Bind sort click handler
+    const thSortSentences = document.getElementById('th-sort-sentences');
+    if (thSortSentences) {
+        thSortSentences.addEventListener('click', () => {
+            if (currentTableSort === 'date_desc' || currentTableSort === 'count_desc') {
+                currentTableSort = 'count_asc';
+                thSortSentences.innerHTML = `Cümle Sayısı <i class="fa-solid fa-sort-up" style="color: var(--accent-purple); margin-left: 4px;"></i>`;
+            } else {
+                currentTableSort = 'count_desc';
+                thSortSentences.innerHTML = `Cümle Sayısı <i class="fa-solid fa-sort-down" style="color: var(--accent-purple); margin-left: 4px;"></i>`;
+            }
+            // Add a double-click or long-click reset to default if desired, but toggle is usually fine.
+            renderWordList(els.inputSearchWords.value);
+        });
+    }
+
     async function renderWordList(filter = '') {
         els.wordListBody.innerHTML = '';
         const lowerFilter = filter.toLowerCase();
 
-        // Sort by addedDate desc
-        const sorted = [...allWords].sort((a,b) => new Date(b.addedDate) - new Date(a.addedDate));
+        // Apply sorting based on currentTableSort
+        let sorted = [...allWords];
+        
+        if (currentTableSort === 'date_desc') {
+            sorted.sort((a,b) => new Date(b.addedDate) - new Date(a.addedDate));
+        } else if (currentTableSort === 'count_asc') {
+            sorted.sort((a,b) => {
+                const countA = sentenceCounts[a.word] || 0;
+                const countB = sentenceCounts[b.word] || 0;
+                return countA - countB;
+            });
+        } else if (currentTableSort === 'count_desc') {
+            sorted.sort((a,b) => {
+                const countA = sentenceCounts[a.word] || 0;
+                const countB = sentenceCounts[b.word] || 0;
+                return countB - countA;
+            });
+        }
 
         for (const w of sorted) {
             if (filter && !w.word.includes(lowerFilter)) continue;
