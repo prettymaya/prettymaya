@@ -1356,6 +1356,12 @@ textarea {
     .main-content {
         margin-left: 0;
         padding: 20px 16px;
+        /* Ensure the main container has enough space at the bottom for the nav bar */
+        padding-bottom: calc(var(--mobile-nav-height) + 30px);
+    }
+    
+    /* Ensure individual scrollable views also clear the nav bar */
+    .view {
         padding-bottom: calc(var(--mobile-nav-height) + 20px);
     }
 
