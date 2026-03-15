@@ -573,8 +573,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (txt.includes('[v1]')) foundTags.add('<span class="api-tag api-tag-v1">v1</span>');
                     if (txt.includes('[v2]')) foundTags.add('<span class="api-tag api-tag-v2">v2</span>');
                     if (txt.includes('[Wiki]')) foundTags.add('<span class="api-tag api-tag-wiki">Wiki</span>');
-                    if (txt.includes('[🤖 AI]')) foundTags.add('<span class="api-tag api-tag-ai"><i class="fa-solid fa-robot"></i> AI</span>');
+                    if (txt.includes('[🤖 AI]') || txt.includes('(🤖 AI Üretimi)')) foundTags.add('<span class="api-tag api-tag-ai"><i class="fa-solid fa-robot"></i> AI</span>');
                 });
+                if (foundTags.size === 0 && meanings.length > 0) {
+                    foundTags.add('<span class="api-tag api-tag-v1">v1</span>');
+                }
                 tagsHtml = Array.from(foundTags).join('');
             } catch (e) { console.error('Error fetching tags:', e); }
             
@@ -1151,7 +1154,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (!mId) return;
                     if (!meaningGroups[mId]) meaningGroups[mId] = [];
                     
-                    const meaningData = wordMeanings.find(m => m.id.toString() === mId.toString());
+                    let meaningData = wordMeanings.find(m => m.id.toString() === mId.toString());
+                    if (!meaningData && wordMeanings.length > 0) meaningData = wordMeanings[0];
                     s.englishDefinition = meaningData ? meaningData.definition : "Anlam bulunamadı";
                     
                     meaningGroups[mId].push(s);
@@ -1378,7 +1382,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!meaningGroups[mId]) meaningGroups[mId] = [];
                 
                 // Embed the English dictionary definition for Hints
-                const meaningData = wordMeanings.find(m => m.id.toString() === mId.toString());
+                let meaningData = wordMeanings.find(m => m.id.toString() === mId.toString());
+                if (!meaningData && wordMeanings.length > 0) meaningData = wordMeanings[0];
                 s.englishDefinition = meaningData ? meaningData.definition : "Anlam bulunamadı";
                 
                 meaningGroups[mId].push(s);
@@ -1893,80 +1898,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentSession = null;
     });
     
-    // ─── Mobile Pull To Refresh (PTR) ───────────────────────
-    let touchStartY = 0;
-    let ptrDistance = 0;
-    const maxPtrDistance = 70;
-    
-    // Attach to document to capture swipes anywhere, checking global scroll
-    document.addEventListener('touchstart', (e) => {
-        // Only trigger if we are at the very top of the page
-        if (window.scrollY > 0) return;
-        touchStartY = e.touches[0].clientY;
-        els.ptrIndicator.style.transition = 'none';
-        els.ptrIndicator.style.top = '-50px';
-    }, {passive: true});
-
-    document.addEventListener('touchmove', (e) => {
-        if (window.scrollY > 0 || touchStartY === 0) {
-            ptrDistance = 0;
-            return;
-        }
-        
-        const currentY = e.touches[0].clientY;
-        const diffY = currentY - touchStartY;
-        
-        if (diffY > 0) {
-            // Dragging down while at the top
-            ptrDistance = Math.min(diffY * 0.4, maxPtrDistance); // Resistance factor
-            
-            if (ptrDistance > 10) {
-                // To prevent normal scroll if we are pulling down
-                if (e.cancelable) e.preventDefault();
-            }
-            
-            els.ptrIndicator.style.top = `${ptrDistance - 50}px`;
-            
-            // Visual feedback if we reached threshold
-            if (ptrDistance >= maxPtrDistance - 5) {
-                els.ptrIndicator.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i>';
-            } else {
-                els.ptrIndicator.innerHTML = '<i class="fa-solid fa-arrow-down"></i>';
-            }
-        }
-    }, {passive: false});
-
-    document.addEventListener('touchend', async () => {
-        if (ptrDistance === 0 || touchStartY === 0) return;
-        
-        els.ptrIndicator.style.transition = 'top 0.3s ease-out';
-        
-        if (ptrDistance >= maxPtrDistance - 5) {
-            // Trigger Refresh
-            els.ptrIndicator.style.top = '10px';
-            els.ptrIndicator.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i>';
-            
-            try {
-                await updateDashboard();
-                renderWordList(els.searchInput.value.trim());
-                showToast('Veriler güncellendi', 'success');
-            } catch (err) {
-                console.error(err);
-                showToast('Güncellenirken hata oluştu', 'error');
-            }
-            
-            // Hide after API complete
-            setTimeout(() => {
-                els.ptrIndicator.style.top = '-50px';
-            }, 500);
-            
-        } else {
-            // Cancel Refresh
-            els.ptrIndicator.style.top = '-50px';
-        }
-        
-        touchStartY = 0;
-        ptrDistance = 0;
-    });
-
 });
