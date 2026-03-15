@@ -626,6 +626,7 @@ textarea {
     font-weight: 600;
     color: var(--text-primary);
     overflow: visible;
+    white-space: normal !important;
 }
 
 .sentence-count {
@@ -656,8 +657,9 @@ textarea {
 .api-tags-container {
     display: flex;
     align-items: center;
-    margin-left: 6px;
     gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 4px;
 }
 
 .api-tag {

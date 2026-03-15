@@ -588,9 +588,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="word-cell" style="display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                    <span style="font-weight: 600; font-size: 1.05rem;">${w.word}</span>
-                    <div class="api-tags-container" style="display: flex; align-items: center; margin-left: 6px; gap: 2px;">
+                <td class="word-cell">
+                    <span style="font-weight: 600; font-size: 1.05rem; display: block;">${w.word}</span>
+                    <div class="api-tags-container">
                         ${tagsHtml}
                     </div>
                 </td>
@@ -612,20 +612,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             els.wordListBody.appendChild(tr);
         }
-
-        // Bind detail buttons
-        document.querySelectorAll('.btn-word-detail').forEach(btn => {
-            btn.addEventListener('click', (e) => openWordDetails(e.currentTarget.dataset.word));
-        });
-
-        // Bind generator buttons
-        document.querySelectorAll('.btn-word-generate-all').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const w = e.currentTarget.dataset.word;
-                generateSentencesForAllMeanings(w, 3);
-            });
-        });
     }
+    
+    // Global Event Delegation for Word List Buttons
+    els.wordListBody.addEventListener('click', (e) => {
+        const detailBtn = e.target.closest('.btn-word-detail');
+        if (detailBtn) {
+            openWordDetails(detailBtn.dataset.word);
+            return;
+        }
+        
+        const generateBtn = e.target.closest('.btn-word-generate-all');
+        if (generateBtn) {
+            generateSentencesForAllMeanings(generateBtn.dataset.word, 3);
+        }
+    });
 
     els.searchInput.addEventListener('input', (e) => {
         clearTimeout(searchTimeout);
@@ -1539,7 +1540,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.readingHint.textContent = card.sentence.hint;
             
             // Show English Definition
-            if (card.sentence.englishDefinition) {
+            if (card.sentence.englishDefinition && card.sentence.englishDefinition !== "Anlam bulunamadı") {
                 els.readingEnglishText.textContent = card.sentence.englishDefinition;
                 els.readingEnglishDef.style.display = 'block';
             } else {
@@ -1579,7 +1580,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <h3 style="color: var(--warning); font-size: 2.2rem; font-weight: 800; margin-bottom: 16px; text-transform: lowercase;">${c.word}</h3>
                                 <button class="btn btn-ghost btn-sm btn-show-hint-speaking" data-index="${index}" style="margin-bottom: 12px; font-size: 0.85rem; color: var(--text-muted);"><i class="fa-solid fa-eye"></i> İpucu Göster</button>
                                 <div class="speaking-hint-container" id="speaking-hint-${index}" style="display: none; background: rgba(16, 185, 129, 0.1); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 12px; text-align: left;">
-                                    <div style="color: var(--text-primary); font-size: 0.95rem; margin-bottom: 8px; font-weight: 500; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;">EN: ${c.englishDefinition}</div>
+                                    ${c.englishDefinition && c.englishDefinition !== "Anlam bulunamadı" ? `<div style="color: var(--text-primary); font-size: 0.95rem; margin-bottom: 8px; font-weight: 500; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;">EN: ${c.englishDefinition}</div>` : ''}
                                     <div style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 4px;">Kısa Türkçe İpuçları:</div>
                                     ${c.meanings.map(m => `<div style="color: var(--success); font-size: 0.9rem; margin-bottom: 2px;">• ${m}</div>`).join('')}
                                 </div>
