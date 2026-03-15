@@ -157,7 +157,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         progFill: document.getElementById('session-progress'),
 
         // Toast
-        toastContainer: document.getElementById('toast-container')
+        toastContainer: document.getElementById('toast-container'),
+        
+        // Pull to refresh
+        mainContent: document.querySelector('.main-content'),
+        ptrIndicator: document.getElementById('pull-to-refresh-indicator')
     };
 
     // ─── State ──────────────────────────────────────────────
@@ -553,11 +557,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Sort by addedDate desc
         const sorted = [...allWords].sort((a,b) => new Date(b.addedDate) - new Date(a.addedDate));
 
-        sorted.forEach(w => {
+        sorted.forEach(async w => {
             if (filter && !w.word.includes(lowerFilter)) return;
 
             const count = sentenceCounts[w.word] || 0;
             let statusBadge = '';
+            
+            // Generate Semantic API Tags
+            let tagsHtml = '';
+            try {
+                const meanings = await DB.getMeaningsForWord(w.word);
+                const foundTags = new Set();
+                meanings.forEach(m => {
+                    const txt = m.definition || '';
+                    if (txt.includes('[v1]')) foundTags.add('<span style="background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); font-size: 0.6rem; padding: 1px 4px; border-radius: 4px; margin-left: 4px;">v1</span>');
+                    if (txt.includes('[v2]')) foundTags.add('<span style="background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); font-size: 0.6rem; padding: 1px 4px; border-radius: 4px; margin-left: 4px;">v2</span>');
+                    if (txt.includes('[Wiki]')) foundTags.add('<span style="background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); font-size: 0.6rem; padding: 1px 4px; border-radius: 4px; margin-left: 4px;">Wiki</span>');
+                    if (txt.includes('[🤖 AI]')) foundTags.add('<span style="background: rgba(249,115,22,0.15); color: #fb923c; border: 1px solid rgba(249,115,22,0.3); font-size: 0.6rem; padding: 1px 4px; border-radius: 4px; margin-left: 4px;"><i class="fa-solid fa-robot"></i> AI</span>');
+                });
+                tagsHtml = Array.from(foundTags).join('');
+            } catch (e) { console.error('Error fetching tags:', e); }
             
             if (count >= minSentencesRequired) {
                 statusBadge = `<span class="sentence-count ready"><i class="fa-solid fa-check"></i> ${count}</span>`;
@@ -569,7 +588,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="word-cell">${w.word}</td>
+                <td class="word-cell" style="display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    <span style="font-weight: 600; font-size: 1.05rem;">${w.word}</span>
+                    <div style="display: flex; align-items: center; margin-left: 6px; gap: 2px;">
+                        ${tagsHtml}
+                    </div>
+                </td>
                 <td>${statusBadge}</td>
                 <td>
                     <span class="badge ${count >= minSentencesRequired ? 'badge-purple' : ''}">
@@ -1542,21 +1566,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (els.speakingWordsContainer) {
                 els.speakingWordsContainer.innerHTML = '';
                 
-                // Switch to Flexbox so the 4th item can span full/center on the second row
-                els.speakingWordsContainer.style.display = 'flex';
-                els.speakingWordsContainer.style.flexWrap = 'wrap';
-                els.speakingWordsContainer.style.justifyContent = 'center';
+                // Switch back to Grid for standard 3-card layout
+                els.speakingWordsContainer.style.display = 'grid';
+                els.speakingWordsContainer.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
+                els.speakingWordsContainer.style.gap = '20px';
                 
-                // card is actually an array of up to 4 cards for speaking mode
+                // card is an array of up to 3 cards for speaking mode
                 card.forEach((c, index) => {
-                    // Check if it's the 4th item in a 4-item array
-                    const isLastOfFour = (index === 3 && card.length === 4);
-                    // On desktop, 1/3 width minus gap for first 3. Full or half width centered for 4th.
-                    // Using basic flexbasis to scale down on mobile automatically
-                    const flexStyle = isLastOfFour ? 'flex: 0 0 100%; max-width: 400px; margin-top: 10px;' : 'flex: 1 1 250px; max-width: 350px;';
-
                     const cardHtml = `
-                        <div style="background: var(--bg-glass); border-radius: 16px; padding: 24px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; ${flexStyle}">
+                        <div style="background: var(--bg-glass); border-radius: 16px; padding: 24px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between;">
                             <div>
                                 <h3 style="color: var(--warning); font-size: 2.2rem; font-weight: 800; margin-bottom: 16px; text-transform: lowercase;">${c.word}</h3>
                                 <button class="btn btn-ghost btn-sm btn-show-hint-speaking" data-index="${index}" style="margin-bottom: 12px; font-size: 0.85rem; color: var(--text-muted);"><i class="fa-solid fa-eye"></i> İpucu Göster</button>
@@ -1872,6 +1890,80 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.practiceSetup.style.display = 'block';
         document.querySelector('[data-target="view-dashboard"]').click();
         currentSession = null;
+    });
+    
+    // ─── Mobile Pull To Refresh (PTR) ───────────────────────
+    let touchStartY = 0;
+    let ptrDistance = 0;
+    const maxPtrDistance = 70;
+    
+    els.mainContent.addEventListener('touchstart', (e) => {
+        if (els.mainContent.scrollTop !== 0) return;
+        touchStartY = e.touches[0].clientY;
+        els.ptrIndicator.style.transition = 'none';
+        els.ptrIndicator.style.top = '-50px';
+    }, {passive: true});
+
+    els.mainContent.addEventListener('touchmove', (e) => {
+        if (els.mainContent.scrollTop !== 0 || touchStartY === 0) {
+            ptrDistance = 0;
+            return;
+        }
+        
+        const currentY = e.touches[0].clientY;
+        const diffY = currentY - touchStartY;
+        
+        if (diffY > 0) {
+            // Dragging down while at the top
+            ptrDistance = Math.min(diffY * 0.4, maxPtrDistance); // Resistance factor
+            
+            if (ptrDistance > 10) {
+                // To prevent normal scroll if we are pulling down
+                if (e.cancelable) e.preventDefault();
+            }
+            
+            els.ptrIndicator.style.top = `${ptrDistance - 50}px`;
+            
+            // Visual feedback if we reached threshold
+            if (ptrDistance >= maxPtrDistance - 5) {
+                els.ptrIndicator.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i>';
+            } else {
+                els.ptrIndicator.innerHTML = '<i class="fa-solid fa-arrow-down"></i>';
+            }
+        }
+    }, {passive: false}); // Non-passive to allow e.preventDefault() if needed
+
+    els.mainContent.addEventListener('touchend', async () => {
+        if (ptrDistance === 0 || touchStartY === 0) return;
+        
+        els.ptrIndicator.style.transition = 'top 0.3s ease-out';
+        
+        if (ptrDistance >= maxPtrDistance - 5) {
+            // Trigger Refresh
+            els.ptrIndicator.style.top = '10px';
+            els.ptrIndicator.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i>';
+            
+            try {
+                await updateDashboard();
+                renderWordList(els.searchInput.value.trim());
+                showToast('Veriler güncellendi', 'success');
+            } catch (err) {
+                console.error(err);
+                showToast('Güncellenirken hata oluştu', 'error');
+            }
+            
+            // Hide after API complete
+            setTimeout(() => {
+                els.ptrIndicator.style.top = '-50px';
+            }, 500);
+            
+        } else {
+            // Cancel Refresh
+            els.ptrIndicator.style.top = '-50px';
+        }
+        
+        touchStartY = 0;
+        ptrDistance = 0;
     });
 
 });

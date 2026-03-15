@@ -46,6 +46,10 @@
 
         <!-- Main Content Area -->
         <main class="main-content">
+            
+            <div id="pull-to-refresh-indicator" style="position: absolute; top: -50px; left: 0; width: 100%; height: 50px; display: flex; justify-content: center; align-items: center; transition: top 0.2s ease-out; z-index: 1000; color: var(--accent-purple); font-size: 1.5rem;">
+                <i class="fa-solid fa-rotate"></i>
+            </div>
 
             <!-- 1. Dashboard View -->
             <section id="view-dashboard" class="view active">
@@ -373,7 +377,7 @@
                             </div>
                             
                             <button class="btn btn-primary btn-lg" id="btn-speaking-next" style="width: 100%; max-width: 300px; margin: 0 auto; display: block;">
-                                Sıradaki Kelimeler <i class="fa-solid fa-forward"></i>
+                                Sıradaki 3 Kelime <i class="fa-solid fa-forward"></i>
                             </button>
                         </div>
 
