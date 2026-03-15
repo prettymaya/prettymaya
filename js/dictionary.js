@@ -121,23 +121,25 @@ const DictionaryService = {
         };
         
         // V1 Schema returns an array of entries (one per Part of Speech etc.)
-        if (data.entries && Array.isArray(data.entries)) {
-            data.entries.forEach(entry => {
-                const partOfSpeech = entry.partOfSpeech || 'unknown';
-                
-                if (entry.senses && Array.isArray(entry.senses)) {
-                    entry.senses.forEach(sense => {
-                        if (sense.definition) {
-                            result.meanings.push({
-                                partOfSpeech: partOfSpeech,
-                                definition: sense.definition + " [v1]",
-                                example: null
-                            });
-                        }
-                    });
-                }
-            });
+        if (!data.entries || !Array.isArray(data.entries) || data.entries.length === 0) {
+            throw new Error(`V1 Sözlükte "${word}" kelimesi bulunamadı (liste boş).`);
         }
+
+        data.entries.forEach(entry => {
+            const partOfSpeech = entry.partOfSpeech || 'unknown';
+            
+            if (entry.senses && Array.isArray(entry.senses)) {
+                entry.senses.forEach(sense => {
+                    if (sense.definition) {
+                        result.meanings.push({
+                            partOfSpeech: partOfSpeech,
+                            definition: sense.definition + " [v1]",
+                            example: null
+                        });
+                    }
+                });
+            }
+        });
         
         if (result.meanings.length === 0) {
             throw new Error(`V1 Sözlükte "${word}" için geçerli bir anlam bulunamadı.`);
