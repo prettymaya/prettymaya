@@ -78,8 +78,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnModeReading: document.getElementById('mode-reading'),
         btnModeMixed: document.getElementById('mode-mixed'),
         btnModeWarmup: document.getElementById('mode-warmup'),
-        readingSetupOpts: document.getElementById('reading-setup-options'),
-        selectReadingCount: document.getElementById('reading-sentence-count'),
         
         // Custom Practice Modal
         btnShowCustomPractice: document.getElementById('btn-show-custom-practice'),
@@ -1176,14 +1174,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (practiceMode === 'reading') {
-            const c = parseInt(els.selectReadingCount.value);
-            currentSession = new ReadingSessionManager(readyMeaningsMap, c);
+            currentSession = new ReadingSessionManager(readyMeaningsMap, 1);
         } else if (practiceMode === 'mixed') {
-            const c = parseInt(els.selectReadingCount.value);
-            currentSession = new SessionManager(readyMeaningsMap, c);
+            currentSession = new SessionManager(readyMeaningsMap, 1);
         } else if (practiceMode === 'warmup') {
-            const c = parseInt(els.selectReadingCount.value);
-            currentSession = new WarmUpSessionManager(readyMeaningsMap, c);
+            currentSession = new WarmUpSessionManager(readyMeaningsMap, 1);
         } else if (practiceMode === 'speaking') {
             currentSession = new SpeakingSessionManager([...readyMeaningsMap.keys()], readyMeaningsMap);
         } else {
@@ -1210,7 +1205,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnModeReading.className = 'btn btn-secondary';
         els.btnModeMixed.className = 'btn btn-secondary';
         els.btnModeWarmup.className = 'btn btn-secondary';
-        els.readingSetupOpts.style.display = 'none';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle pratik yapmak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
@@ -1221,7 +1215,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnModeRecall.className = 'btn btn-secondary';
         els.btnModeMixed.className = 'btn btn-secondary';
         els.btnModeWarmup.className = 'btn btn-secondary';
-        els.readingSetupOpts.style.display = 'block';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelime okumak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
@@ -1232,7 +1225,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnModeRecall.className = 'btn btn-secondary';
         els.btnModeReading.className = 'btn btn-secondary';
         els.btnModeWarmup.className = 'btn btn-secondary';
-        els.readingSetupOpts.style.display = 'block';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle karma pratik istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
@@ -1244,7 +1236,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnModeReading.className = 'btn btn-secondary';
         els.btnModeMixed.className = 'btn btn-secondary';
         if (els.btnModeSpeaking) els.btnModeSpeaking.className = 'btn btn-secondary';
-        els.readingSetupOpts.style.display = 'block';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle ısınma yapmak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
@@ -1257,7 +1248,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.btnModeReading.className = 'btn btn-secondary';
             els.btnModeMixed.className = 'btn btn-secondary';
             els.btnModeWarmup.className = 'btn btn-secondary';
-            els.readingSetupOpts.style.display = 'block';
             els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Sohbette kullanmak için kaç kelime istiyorsun?';
             els.countSelectors[0].parentElement.style.display = 'flex';
         });
@@ -1422,14 +1412,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Init Session Manager based on mode
         if (practiceMode === 'reading') {
-            const c = parseInt(els.selectReadingCount.value);
-            currentSession = new ReadingSessionManager(filteredMap, c);
+            currentSession = new ReadingSessionManager(filteredMap, 1);
         } else if (practiceMode === 'mixed') {
-            const c = parseInt(els.selectReadingCount.value);
-            currentSession = new SessionManager(filteredMap, c);
+            currentSession = new SessionManager(filteredMap, 1);
         } else if (practiceMode === 'warmup') {
-            const c = parseInt(els.selectReadingCount.value);
-            currentSession = new WarmUpSessionManager(filteredMap, c);
+            currentSession = new WarmUpSessionManager(filteredMap, 1);
         } else if (practiceMode === 'speaking') {
             currentSession = new SpeakingSessionManager([...filteredMap.keys()], filteredMap);
         } else {
