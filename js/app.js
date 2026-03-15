@@ -550,15 +550,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // ─── Word Management ────────────────────────────────────
-    function renderWordList(filter = '') {
+    async function renderWordList(filter = '') {
         els.wordListBody.innerHTML = '';
         const lowerFilter = filter.toLowerCase();
 
         // Sort by addedDate desc
         const sorted = [...allWords].sort((a,b) => new Date(b.addedDate) - new Date(a.addedDate));
 
-        sorted.forEach(async w => {
-            if (filter && !w.word.includes(lowerFilter)) return;
+        for (const w of sorted) {
+            if (filter && !w.word.includes(lowerFilter)) continue;
 
             const count = sentenceCounts[w.word] || 0;
             let statusBadge = '';
@@ -570,10 +570,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const foundTags = new Set();
                 meanings.forEach(m => {
                     const txt = m.definition || '';
-                    if (txt.includes('[v1]')) foundTags.add('<span style="background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); font-size: 0.6rem; padding: 1px 4px; border-radius: 4px; margin-left: 4px;">v1</span>');
-                    if (txt.includes('[v2]')) foundTags.add('<span style="background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); font-size: 0.6rem; padding: 1px 4px; border-radius: 4px; margin-left: 4px;">v2</span>');
-                    if (txt.includes('[Wiki]')) foundTags.add('<span style="background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); font-size: 0.6rem; padding: 1px 4px; border-radius: 4px; margin-left: 4px;">Wiki</span>');
-                    if (txt.includes('[🤖 AI]')) foundTags.add('<span style="background: rgba(249,115,22,0.15); color: #fb923c; border: 1px solid rgba(249,115,22,0.3); font-size: 0.6rem; padding: 1px 4px; border-radius: 4px; margin-left: 4px;"><i class="fa-solid fa-robot"></i> AI</span>');
+                    if (txt.includes('[v1]')) foundTags.add('<span class="api-tag api-tag-v1">v1</span>');
+                    if (txt.includes('[v2]')) foundTags.add('<span class="api-tag api-tag-v2">v2</span>');
+                    if (txt.includes('[Wiki]')) foundTags.add('<span class="api-tag api-tag-wiki">Wiki</span>');
+                    if (txt.includes('[🤖 AI]')) foundTags.add('<span class="api-tag api-tag-ai"><i class="fa-solid fa-robot"></i> AI</span>');
                 });
                 tagsHtml = Array.from(foundTags).join('');
             } catch (e) { console.error('Error fetching tags:', e); }
@@ -590,7 +590,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             tr.innerHTML = `
                 <td class="word-cell" style="display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                     <span style="font-weight: 600; font-size: 1.05rem;">${w.word}</span>
-                    <div style="display: flex; align-items: center; margin-left: 6px; gap: 2px;">
+                    <div class="api-tags-container" style="display: flex; align-items: center; margin-left: 6px; gap: 2px;">
                         ${tagsHtml}
                     </div>
                 </td>
@@ -611,7 +611,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
 
             els.wordListBody.appendChild(tr);
-        });
+        }
 
         // Bind detail buttons
         document.querySelectorAll('.btn-word-detail').forEach(btn => {
@@ -1150,7 +1150,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (!mId) return;
                     if (!meaningGroups[mId]) meaningGroups[mId] = [];
                     
-                    const meaningData = wordMeanings.find(m => m.id == mId);
+                    const meaningData = wordMeanings.find(m => m.id.toString() === mId.toString());
                     s.englishDefinition = meaningData ? meaningData.definition : "Anlam bulunamadı";
                     
                     meaningGroups[mId].push(s);
@@ -1377,7 +1377,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!meaningGroups[mId]) meaningGroups[mId] = [];
                 
                 // Embed the English dictionary definition for Hints
-                const meaningData = wordMeanings.find(m => m.id == mId);
+                const meaningData = wordMeanings.find(m => m.id.toString() === mId.toString());
                 s.englishDefinition = meaningData ? meaningData.definition : "Anlam bulunamadı";
                 
                 meaningGroups[mId].push(s);
@@ -1897,15 +1897,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     let ptrDistance = 0;
     const maxPtrDistance = 70;
     
-    els.mainContent.addEventListener('touchstart', (e) => {
-        if (els.mainContent.scrollTop !== 0) return;
+    // Attach to document to capture swipes anywhere, checking global scroll
+    document.addEventListener('touchstart', (e) => {
+        // Only trigger if we are at the very top of the page
+        if (window.scrollY > 0) return;
         touchStartY = e.touches[0].clientY;
         els.ptrIndicator.style.transition = 'none';
         els.ptrIndicator.style.top = '-50px';
     }, {passive: true});
 
-    els.mainContent.addEventListener('touchmove', (e) => {
-        if (els.mainContent.scrollTop !== 0 || touchStartY === 0) {
+    document.addEventListener('touchmove', (e) => {
+        if (window.scrollY > 0 || touchStartY === 0) {
             ptrDistance = 0;
             return;
         }
@@ -1931,9 +1933,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 els.ptrIndicator.innerHTML = '<i class="fa-solid fa-arrow-down"></i>';
             }
         }
-    }, {passive: false}); // Non-passive to allow e.preventDefault() if needed
+    }, {passive: false});
 
-    els.mainContent.addEventListener('touchend', async () => {
+    document.addEventListener('touchend', async () => {
         if (ptrDistance === 0 || touchStartY === 0) return;
         
         els.ptrIndicator.style.transition = 'top 0.3s ease-out';
