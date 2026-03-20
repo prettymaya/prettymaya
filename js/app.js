@@ -705,6 +705,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <button class="btn btn-ghost btn-sm btn-word-generate-all" data-word="${w.word}" title="Tüm Anlamlara +3 AI Üret" style="color: var(--accent-purple-light); padding: 8px;">
                             <i class="fa-solid fa-plus"></i> <span style="font-weight:bold;">3</span>
                         </button>
+                        <button class="btn-cat-add btn-cat-mobile" data-word="${w.word}" title="Kategoriye ekle/çıkar">
+                            <i class="fa-solid fa-folder-plus"></i>
+                        </button>
                     </td>
                 `;
                 els.wordListBody.appendChild(tr);
@@ -758,7 +761,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const word = catAddBtn.dataset.word;
             const categories = await DB.getAllCategories();
             const wordCats = await DB.getCategoriesForWord(word);
-            const wordCatIds = new Set(wordCats.map(c => c.id));
+            const wordCatIds = new Set(wordCats); // Already [categoryId, ...] numbers
 
             const popup = document.createElement('div');
             popup.className = 'cat-popup';

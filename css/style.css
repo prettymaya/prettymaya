@@ -637,6 +637,14 @@ textarea {
     white-space: nowrap;
 }
 
+/* Mobile category button — hidden on desktop since Kategori column is visible */
+.btn-cat-mobile {
+    display: none;
+    width: 28px;
+    height: 28px;
+    font-size: 0.85rem;
+}
+
 .sentence-count {
     display: inline-flex;
     align-items: center;
@@ -1558,6 +1566,22 @@ textarea {
     .category-tab {
         font-size: 0.7rem !important;
         padding: 4px 8px !important;
+    }
+
+    /* Show mobile category button when Kategori column is hidden */
+    .btn-cat-mobile {
+        display: inline-flex;
+    }
+
+    /* Position popup fixed center on mobile */
+    .cat-popup {
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%);
+        max-height: 70vh;
+        overflow-y: auto;
+        min-width: 220px;
     }
 
     .generation-modal {
