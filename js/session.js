@@ -198,9 +198,13 @@ class SessionManager {
 
     checkAnswer(userInput) {
         if (!this.currentCard) return false;
-        const correct = this.currentCard.sentence.answer.toLowerCase().trim();
-        const input = userInput.toLowerCase().trim();
-        return input === correct;
+        const normalize = (str) => str
+            .toLowerCase()
+            .trim()
+            .replace(/[''`´]/g, '')  // remove apostrophes
+            .replace(/[.,!?;:\-—–()"\[\]{}]/g, '') // remove punctuation
+            .replace(/\s+/g, ' ');   // collapse whitespace
+        return normalize(userInput) === normalize(this.currentCard.sentence.answer);
     }
 
     getProgress() {

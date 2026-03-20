@@ -594,28 +594,30 @@ textarea {
 .word-list-table {
     width: 100%;
     border-collapse: collapse;
-    table-layout: fixed;
+    table-layout: auto;
 }
 
 .word-list-table th {
     position: sticky;
     top: 0;
     background: var(--bg-secondary);
-    padding: 12px 16px;
+    padding: 10px 12px;
     text-align: left;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     border-bottom: 1px solid var(--border);
     z-index: 1;
+    white-space: nowrap;
 }
 
 .word-list-table td {
-    padding: 10px 16px;
-    font-size: 0.88rem;
+    padding: 8px 12px;
+    font-size: 0.85rem;
     border-bottom: 1px solid var(--border);
+    vertical-align: middle;
 }
 
 .word-list-table tr:hover td {
@@ -627,6 +629,12 @@ textarea {
     color: var(--text-primary);
     overflow: visible;
     white-space: normal !important;
+    max-width: 200px;
+}
+
+.action-cell {
+    text-align: center;
+    white-space: nowrap;
 }
 
 .sentence-count {
@@ -1518,8 +1526,38 @@ textarea {
     }
 
     .word-list-table th:nth-child(3),
-    .word-list-table td:nth-child(3) {
+    .word-list-table td:nth-child(3),
+    .word-list-table th:nth-child(4),
+    .word-list-table td:nth-child(4) {
         display: none;
+    }
+
+    .word-list-table td {
+        padding: 6px 8px;
+        font-size: 0.8rem;
+    }
+
+    .word-list-table th {
+        padding: 8px;
+        font-size: 0.68rem;
+    }
+
+    .word-list-table .word-cell {
+        max-width: 120px;
+    }
+
+    .cat-badge {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+    }
+
+    #category-tabs {
+        gap: 4px;
+    }
+
+    .category-tab {
+        font-size: 0.7rem !important;
+        padding: 4px 8px !important;
     }
 
     .generation-modal {

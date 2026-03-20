@@ -698,7 +698,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         ${(wordCatMap[w.word] || []).map(cid => `<span class="cat-badge">${catNameMap[cid] || cid}</span>`).join('')}
                         <button class="btn-cat-add" data-word="${w.word}" title="Kategoriye ekle/çıkar">+</button>
                     </td>
-                    <td style="display: flex; gap: 4px; justify-content: center; align-items: center;">
+                    <td class="action-cell">
                         <button class="btn btn-ghost btn-sm btn-word-detail" data-word="${w.word}">
                             Detay
                         </button>
