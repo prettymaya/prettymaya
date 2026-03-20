@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" href="icon.png">
     <!-- Icons: FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="css/style.css?v=43">
+    <link rel="stylesheet" href="css/style.css?v=44">
 </head>
 <body>
 
@@ -109,6 +109,9 @@
                             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                                 <button class="btn btn-sm" id="btn-cleanup-meanings" style="background-color: var(--error); color: white;" title="Cümlesi olmayan (boş) tüm anlamları veritabanından kalıcı siler">
                                     <i class="fa-solid fa-trash-can"></i> Fazlalıkları Sil
+                                </button>
+                                <button class="btn btn-sm" id="btn-trim-meanings" style="background-color: var(--warning); color: #111;" title="4'ten fazla anlamı olan kelimeleri bulur, ilk 4 hariç diğer anlamları ve cümlelerini siler">
+                                    <i class="fa-solid fa-scissors"></i> Max 4 Anlam
                                 </button>
                                 <button class="btn btn-primary btn-sm" id="btn-generate-all" style="background-color: var(--accent-purple); color: white;" title="Tüm kelimelere sırayla 3 cümle üretir">
                                     <i class="fa-solid fa-bolt"></i> Tümüne Üret
@@ -739,11 +742,11 @@
     <div class="toast-container" id="toast-container"></div>
 
     <!-- Scripts -->
-    <script src="js/db.js?v=43"></script>
-    <script src="js/sync.js?v=43"></script>
-    <script src="js/dictionary.js?v=43"></script>
-    <script src="js/gemini.js?v=43"></script>
-    <script src="js/session.js?v=43"></script>
-    <script src="js/app.js?v=43"></script>
+    <script src="js/db.js?v=44"></script>
+    <script src="js/sync.js?v=44"></script>
+    <script src="js/dictionary.js?v=44"></script>
+    <script src="js/gemini.js?v=44"></script>
+    <script src="js/session.js?v=44"></script>
+    <script src="js/app.js?v=44"></script>
 </body>
 </html>

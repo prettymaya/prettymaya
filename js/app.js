@@ -1454,6 +1454,85 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // Trim meanings to max 4 per word
+    const btnTrimMeanings = document.getElementById('btn-trim-meanings');
+    if (btnTrimMeanings) {
+        btnTrimMeanings.addEventListener('click', async () => {
+            btnTrimMeanings.disabled = true;
+            btnTrimMeanings.innerHTML = '<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span> Analiz ediliyor...';
+
+            try {
+                const allMeanings = await DB.getAllMeanings();
+                // Group by word
+                const byWord = {};
+                for (const m of allMeanings) {
+                    if (!byWord[m.word]) byWord[m.word] = [];
+                    byWord[m.word].push(m);
+                }
+
+                // Find words with > 4 meanings
+                const wordsToTrim = [];
+                let totalToDelete = 0;
+                for (const [word, meanings] of Object.entries(byWord)) {
+                    if (meanings.length > 4) {
+                        // Sort by ID ascending (keep first 4)
+                        meanings.sort((a, b) => a.id - b.id);
+                        const excess = meanings.slice(4);
+                        wordsToTrim.push({ word, excess });
+                        totalToDelete += excess.length;
+                    }
+                }
+
+                if (wordsToTrim.length === 0) {
+                    showToast('Tüm kelimeler zaten max 4 anlam içeriyor! 🎉', 'success');
+                    return;
+                }
+
+                if (!confirm(`${wordsToTrim.length} kelimede ${totalToDelete} fazla anlam bulundu. İlk 4 hariç diğer anlamları ve cümlelerini silmek istediğinize emin misiniz?`)) return;
+
+                btnTrimMeanings.innerHTML = '<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span> Siliniyor...';
+
+                // Pre-load all sentences and index by meaningId
+                const allSentences = await DB.getAllSentences();
+                const sentencesByMeaning = {};
+                for (const s of allSentences) {
+                    if (s.meaningId) {
+                        if (!sentencesByMeaning[s.meaningId]) sentencesByMeaning[s.meaningId] = [];
+                        sentencesByMeaning[s.meaningId].push(s);
+                    }
+                }
+
+                let deletedMeanings = 0;
+                let deletedSentences = 0;
+
+                for (const { word, excess } of wordsToTrim) {
+                    for (const m of excess) {
+                        // Delete sentences for this meaning
+                        const sentences = sentencesByMeaning[m.id] || [];
+                        for (const s of sentences) {
+                            await DB.deleteSentenceById(s.id);
+                            deletedSentences++;
+                        }
+                        // Delete the meaning
+                        await DB.deleteMeaning(m.id);
+                        deletedMeanings++;
+                    }
+                }
+
+                showToast(`${deletedMeanings} fazla anlam ve ${deletedSentences} cümle silindi!`, 'success');
+                sentenceCounts = await DB.getAllSentenceCounts();
+                await updateDashboard();
+                renderWordList();
+
+            } catch (e) {
+                console.error('Trim error:', e);
+                showToast('Hata: ' + e.message, 'error');
+            } finally {
+                btnTrimMeanings.disabled = false;
+                btnTrimMeanings.innerHTML = '<i class="fa-solid fa-scissors"></i> Max 4 Anlam';
+            }
+        });
+    }
     els.btnCancelGen.addEventListener('click', () => {
         cancelGeneration = true;
         els.btnCancelGen.textContent = 'İptal Ediliyor...';
