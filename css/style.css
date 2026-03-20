@@ -583,7 +583,7 @@ textarea {
 
 /* ─── Word List Table  ────────────────────────── */
 .word-list-container {
-    max-height: 500px;
+    max-height: 70vh;
     overflow-y: auto;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;

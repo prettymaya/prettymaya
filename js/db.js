@@ -182,12 +182,23 @@ const DB = {
     },
 
     async getAllSentenceCounts() {
-        const sentences = await this.getAllSentences();
-        const counts = {};
-        for (const s of sentences) {
-            counts[s.word] = (counts[s.word] || 0) + 1;
-        }
-        return counts;
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('sentences', 'readonly');
+            const store = tx.objectStore('sentences');
+            const index = store.index('word');
+            const counts = {};
+            const req = index.openKeyCursor();
+            req.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    counts[cursor.key] = (counts[cursor.key] || 0) + 1;
+                    cursor.continue();
+                } else {
+                    resolve(counts);
+                }
+            };
+            req.onerror = () => reject(req.error);
+        });
     },
 
     async addSentences(word, sentences) {
@@ -288,6 +299,56 @@ const DB = {
             const index = store.index('word');
             const req = index.getAll(IDBKeyRange.only(word));
             req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async getAllMeaningsGrouped() {
+        const all = await this.getAllMeanings();
+        const grouped = {};
+        for (const m of all) {
+            if (!grouped[m.word]) grouped[m.word] = [];
+            grouped[m.word].push(m);
+        }
+        return grouped;
+    },
+
+    async getAllSentencesGrouped() {
+        const all = await this.getAllSentences();
+        const grouped = {};
+        for (const s of all) {
+            if (!grouped[s.word]) grouped[s.word] = [];
+            grouped[s.word].push(s);
+        }
+        return grouped;
+    },
+
+    async getMeaningCount() {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('meanings', 'readonly');
+            const store = tx.objectStore('meanings');
+            const req = store.count();
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async getActiveMeaningCount() {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('sentences', 'readonly');
+            const store = tx.objectStore('sentences');
+            const index = store.index('meaningId');
+            const uniqueMeanings = new Set();
+            const req = index.openKeyCursor();
+            req.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    if (cursor.key) uniqueMeanings.add(cursor.key);
+                    cursor.continue();
+                } else {
+                    resolve(uniqueMeanings.size);
+                }
+            };
             req.onerror = () => reject(req.error);
         });
     },

@@ -166,6 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ─── State ──────────────────────────────────────────────
     let allWords = [];
     let sentenceCounts = {};
+    let allMeaningsGrouped = {};
     let sessionSentencesOriginal = []; // Backup of original order
     
     // Sort states: 'date_desc' (default), 'count_asc', 'count_desc'
@@ -510,19 +511,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const history = await DB.getSessionHistory();
 
-        // Calculate active meanings mapping (Cards)
-        const activeMeanings = new Set();
-        const allSentences = await DB.getAllSentences();
-        
-        allSentences.forEach(s => {
-            const mId = s.meaningId || `uncategorized_${s.word}`;
-            activeMeanings.add(mId);
-        });
-
-        const meaningCount = activeMeanings.size;
+        // Efficient active meaning count (cursor-based, no full data load)
+        const meaningCount = await DB.getActiveMeaningCount();
 
         els.stats.words.textContent = `${allWords.length} Kelime (${meaningCount} Kart)`;
-        els.stats.words.style.fontSize = "1.5rem"; // Reduce font slightly to fit the longer string
+        els.stats.words.style.fontSize = "1.5rem";
         els.stats.sentences.textContent = totalSentences;
         els.stats.sessions.textContent = history.length;
     }
@@ -566,13 +559,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 thSortSentences.innerHTML = `Cümle Sayısı <i class="fa-solid fa-sort-down" style="color: var(--accent-purple); margin-left: 4px;"></i>`;
             }
             // Add a double-click or long-click reset to default if desired, but toggle is usually fine.
-            renderWordList(els.inputSearchWords.value);
+            renderWordList(els.searchInput.value);
         });
     }
 
+    // ─── Virtual Scroll State ───────────────────────────────
+    let filteredWords = [];
+    const ROW_HEIGHT = 56; // approximate row height in px
+    const BUFFER_ROWS = 10;
+    let virtualScrollBound = false;
+
     async function renderWordList(filter = '') {
-        els.wordListBody.innerHTML = '';
         const lowerFilter = filter.toLowerCase();
+
+        // Load all meanings in one batch (instead of N+1 per-word queries)
+        allMeaningsGrouped = await DB.getAllMeaningsGrouped();
 
         // Apply sorting based on currentTableSort
         let sorted = [...allWords];
@@ -593,16 +594,53 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        for (const w of sorted) {
-            if (filter && !w.word.includes(lowerFilter)) continue;
+        // Filter
+        filteredWords = lowerFilter 
+            ? sorted.filter(w => w.word.includes(lowerFilter))
+            : sorted;
 
-            const count = sentenceCounts[w.word] || 0;
-            let statusBadge = '';
+        // Setup virtual scroll
+        const container = els.wordListBody.closest('.word-list-container');
+        els.wordListBody.innerHTML = '';
+
+        // Create spacer for total height
+        const totalHeight = filteredWords.length * ROW_HEIGHT;
+        let spacerTop = document.getElementById('vs-spacer-top');
+        let spacerBottom = document.getElementById('vs-spacer-bottom');
+        
+        if (!spacerTop) {
+            spacerTop = document.createElement('tr');
+            spacerTop.id = 'vs-spacer-top';
+            spacerTop.innerHTML = '<td colspan="4" style="padding:0;border:none;"></td>';
+        }
+        if (!spacerBottom) {
+            spacerBottom = document.createElement('tr');
+            spacerBottom.id = 'vs-spacer-bottom';
+            spacerBottom.innerHTML = '<td colspan="4" style="padding:0;border:none;"></td>';
+        }
+
+        function renderVisibleRows() {
+            const scrollTop = container.scrollTop;
+            const viewportHeight = container.clientHeight;
             
-            // Generate Semantic API Tags
-            let tagsHtml = '';
-            try {
-                const meanings = await DB.getMeaningsForWord(w.word);
+            const startIdx = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER_ROWS);
+            const endIdx = Math.min(filteredWords.length, Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + BUFFER_ROWS);
+
+            // Clear and rebuild only visible rows
+            els.wordListBody.innerHTML = '';
+            
+            // Top spacer
+            spacerTop.querySelector('td').style.height = (startIdx * ROW_HEIGHT) + 'px';
+            els.wordListBody.appendChild(spacerTop);
+
+            for (let i = startIdx; i < endIdx; i++) {
+                const w = filteredWords[i];
+                const count = sentenceCounts[w.word] || 0;
+                let statusBadge = '';
+                
+                // Generate tags from cached meanings (no DB query!)
+                let tagsHtml = '';
+                const meanings = allMeaningsGrouped[w.word] || [];
                 const foundTags = new Set();
                 meanings.forEach(m => {
                     const txt = m.definition || '';
@@ -615,41 +653,62 @@ document.addEventListener('DOMContentLoaded', async () => {
                     foundTags.add('<span class="api-tag api-tag-v1">v1</span>');
                 }
                 tagsHtml = Array.from(foundTags).join('');
-            } catch (e) { console.error('Error fetching tags:', e); }
-            
-            if (count >= minSentencesRequired) {
-                statusBadge = `<span class="sentence-count ready"><i class="fa-solid fa-check"></i> ${count}</span>`;
-            } else if (count > 0) {
-                statusBadge = `<span class="sentence-count partial"><i class="fa-solid fa-triangle-exclamation"></i> ${count}/${minSentencesRequired}</span>`;
-            } else {
-                statusBadge = `<span class="sentence-count missing"><i class="fa-solid fa-xmark"></i> ${count}</span>`;
+                
+                if (count >= minSentencesRequired) {
+                    statusBadge = `<span class="sentence-count ready"><i class="fa-solid fa-check"></i> ${count}</span>`;
+                } else if (count > 0) {
+                    statusBadge = `<span class="sentence-count partial"><i class="fa-solid fa-triangle-exclamation"></i> ${count}/${minSentencesRequired}</span>`;
+                } else {
+                    statusBadge = `<span class="sentence-count missing"><i class="fa-solid fa-xmark"></i> ${count}</span>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="word-cell">
+                        <span style="font-weight: 600; font-size: 1.05rem; display: block;">${w.word}</span>
+                        <div class="api-tags-container">
+                            ${tagsHtml}
+                        </div>
+                    </td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <span class="badge ${count >= minSentencesRequired ? 'badge-purple' : ''}">
+                            ${count >= minSentencesRequired ? 'Hazır' : 'Eksik'}
+                        </span>
+                    </td>
+                    <td style="display: flex; gap: 4px; justify-content: center; align-items: center;">
+                        <button class="btn btn-ghost btn-sm btn-word-detail" data-word="${w.word}">
+                            Detay
+                        </button>
+                        <button class="btn btn-ghost btn-sm btn-word-generate-all" data-word="${w.word}" title="Tüm Anlamlara +3 AI Üret" style="color: var(--accent-purple-light); padding: 8px;">
+                            <i class="fa-solid fa-plus"></i> <span style="font-weight:bold;">3</span>
+                        </button>
+                    </td>
+                `;
+                els.wordListBody.appendChild(tr);
             }
 
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="word-cell">
-                    <span style="font-weight: 600; font-size: 1.05rem; display: block;">${w.word}</span>
-                    <div class="api-tags-container">
-                        ${tagsHtml}
-                    </div>
-                </td>
-                <td>${statusBadge}</td>
-                <td>
-                    <span class="badge ${count >= minSentencesRequired ? 'badge-purple' : ''}">
-                        ${count >= minSentencesRequired ? 'Hazır' : 'Eksik'}
-                    </span>
-                </td>
-                <td style="display: flex; gap: 4px; justify-content: center; align-items: center;">
-                    <button class="btn btn-ghost btn-sm btn-word-detail" data-word="${w.word}">
-                        Detay
-                    </button>
-                    <button class="btn btn-ghost btn-sm btn-word-generate-all" data-word="${w.word}" title="Tüm Anlamlara +3 AI Üret" style="color: var(--accent-purple-light); padding: 8px;">
-                        <i class="fa-solid fa-plus"></i> <span style="font-weight:bold;">3</span>
-                    </button>
-                </td>
-            `;
+            // Bottom spacer
+            const bottomSpace = Math.max(0, (filteredWords.length - endIdx) * ROW_HEIGHT);
+            spacerBottom.querySelector('td').style.height = bottomSpace + 'px';
+            els.wordListBody.appendChild(spacerBottom);
+        }
 
-            els.wordListBody.appendChild(tr);
+        renderVisibleRows();
+
+        // Bind scroll listener once
+        if (!virtualScrollBound) {
+            let scrollTicking = false;
+            container.addEventListener('scroll', () => {
+                if (!scrollTicking) {
+                    scrollTicking = true;
+                    requestAnimationFrame(() => {
+                        renderVisibleRows();
+                        scrollTicking = false;
+                    });
+                }
+            });
+            virtualScrollBound = true;
         }
     }
     
@@ -1047,9 +1106,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function openWordDetails(word) {
         currentDetailWord = word;
         
-        // Fetch base word to check for audio
-        const allLocalWords = await DB.getAllWords();
-        const wordData = allLocalWords.find(w => w.word === word);
+        // Use cached allWords instead of re-fetching all 12K words
+        const wordData = allWords.find(w => w.word === word);
         const hasAudio = wordData && wordData.audio;
 
         els.detailWordTitle.innerHTML = `${word} ${hasAudio ? `<button class="btn btn-ghost btn-sm" onclick="new Audio('${wordData.audio}').play()" style="color:var(--accent-blue); margin-left:10px;"><i class="fa-solid fa-volume-high"></i></button>` : ''}`;
@@ -1587,12 +1645,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     els.btnStartSession.addEventListener('click', async () => {
+        els.btnStartSession.disabled = true;
+        els.btnStartSession.innerHTML = '<span class="spinner" style="width:16px;height:16px;"></span> Hazırlanıyor...';
+        
+        try {
         const readyMeaningsMap = new Map();
+        
+        // Batch load ALL sentences and meanings in just 2 queries (instead of 24K+)
+        const allSentencesGrouped = await DB.getAllSentencesGrouped();
+        const allMeaningsMap = await DB.getAllMeaningsGrouped();
         
         for (const w of allWords) {
             const word = w.word;
-            const sentences = await DB.getSentencesForWord(word);
-            const wordMeanings = await DB.getMeaningsForWord(word);
+            const sentences = allSentencesGrouped[word] || [];
+            const wordMeanings = allMeaningsMap[word] || [];
             
             // Group sentences by meaningId
             const meaningGroups = {};
@@ -1663,6 +1729,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.progTotal.textContent = prog.totalWords;
 
         loadNextCard();
+        } finally {
+            els.btnStartSession.disabled = false;
+            els.btnStartSession.innerHTML = 'Oturumu Başlat <i class="fa-solid fa-arrow-right"></i>';
+        }
     });
 
     function updateProgressUI() {
@@ -1799,11 +1869,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div style="background: var(--bg-glass); border-radius: 16px; padding: 24px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between;">
                             <div>
                                 <h3 style="color: var(--warning); font-size: 2.2rem; font-weight: 800; margin-bottom: 16px; text-transform: lowercase;">${c.word}</h3>
-                                <button class="btn btn-ghost btn-sm btn-show-hint-speaking" data-index="${index}" style="margin-bottom: 12px; font-size: 0.85rem; color: var(--text-muted);"><i class="fa-solid fa-eye"></i> İpucu Göster</button>
-                                <div class="speaking-hint-container" id="speaking-hint-${index}" style="display: none; background: rgba(16, 185, 129, 0.1); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 12px; text-align: left;">
-                                    ${c.englishDefinition && c.englishDefinition !== "Anlam bulunamadı" ? `<div style="color: var(--text-primary); font-size: 0.95rem; margin-bottom: 8px; font-weight: 500; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;">EN: ${c.englishDefinition}</div>` : ''}
-                                    <div style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 4px;">Kısa Türkçe İpuçları:</div>
-                                    ${c.meanings.map(m => `<div style="color: var(--success); font-size: 0.9rem; margin-bottom: 2px;">• ${m}</div>`).join('')}
+                                ${c.englishDefinition && c.englishDefinition !== "Anlam bulunamadı" ? `<div style="color: var(--text-primary); font-size: 0.95rem; margin-bottom: 12px; font-weight: 500; background: rgba(16, 185, 129, 0.1); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">EN: ${c.englishDefinition}</div>` : ''}
+                                <button class="btn btn-ghost btn-sm btn-show-hint-speaking" data-index="${index}" style="margin-top: 8px; margin-bottom: 12px; font-size: 0.85rem; color: var(--text-muted);"><i class="fa-solid fa-language"></i> Türkçe İpucu</button>
+                                <div class="speaking-hint-container" id="speaking-hint-${index}" style="display: none; background: rgba(249, 115, 22, 0.1); border: 1px dashed rgba(249, 115, 22, 0.3); border-radius: 8px; padding: 12px; text-align: left;">
+                                    ${c.meanings.map(m => `<div style="color: var(--warning); font-size: 0.9rem; margin-bottom: 2px;">• ${m}</div>`).join('')}
                                 </div>
                             </div>
                         </div>
@@ -1818,10 +1887,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const hintDiv = document.getElementById(`speaking-hint-${idx}`);
                         if (hintDiv.style.display === 'none') {
                             hintDiv.style.display = 'block';
-                            e.currentTarget.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Gizle';
+                            e.currentTarget.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Türkçeyi Gizle';
                         } else {
                             hintDiv.style.display = 'none';
-                            e.currentTarget.innerHTML = '<i class="fa-solid fa-eye"></i> İpucu Göster';
+                            e.currentTarget.innerHTML = '<i class="fa-solid fa-language"></i> Türkçe İpucu';
                         }
                     });
                 });
@@ -2087,8 +2156,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.practiceActive.style.display = 'none';
         
         const prog = currentSession.getProgress();
-        els.document.getElementById('complete-correct').textContent = prog.stats.correct;
-        els.document.getElementById('complete-incorrect').textContent = prog.stats.incorrect;
+        document.getElementById('complete-correct').textContent = prog.stats.correct;
+        document.getElementById('complete-incorrect').textContent = prog.stats.incorrect;
         
         els.practiceComplete.style.display = 'block';
         
@@ -2102,7 +2171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await updateDashboard();
     }
 
-    els.btnFinishSession.addEventListener('click', () => {
+    document.getElementById('btn-finish-session').addEventListener('click', () => {
         els.practiceComplete.style.display = 'none';
         els.practiceSetup.style.display = 'block';
         document.querySelector('[data-target="view-dashboard"]').click();
