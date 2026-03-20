@@ -1006,6 +1006,26 @@ textarea {
     color: var(--accent-purple-light);
 }
 
+/* ─── Category Tabs ──────────────────────────── */
+.category-tab {
+    background: var(--bg-glass);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-weight: 500;
+    transition: all var(--transition-fast);
+}
+
+.category-tab.selected {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.3);
+    color: var(--accent-purple-light);
+    font-weight: 600;
+}
+
+.category-tab:hover:not(.selected) {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.15);
+}
 /* ─── Session Complete ────────────────────────── */
 .session-complete {
     text-align: center;

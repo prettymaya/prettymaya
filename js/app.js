@@ -171,13 +171,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Sort states: 'date_desc' (default), 'count_asc', 'count_desc'
     let currentTableSort = 'date_desc';
-    let minSentencesRequired = 2;
+    let minSentencesRequired = 3;
     let cancelGeneration = false;
     let currentSession = null;
     let selectedWordCount = 20;
     let practiceMode = 'recall'; // 'recall' | 'reading' | 'mixed'
     let currentCardMode = 'recall';
     let searchTimeout = null;
+    let selectedCategoryId = 'all'; // For word list filtering
+    let practiceSource = 'all'; // 'all' or 'category'
+    let selectedPracticeCategories = []; // category IDs for practice
 
     // Gamification & Go Back State
     let goBackHistory = []; // Stores recent cards & modes for "Go Back" functionality
@@ -236,6 +239,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ─── Initialization ─────────────────────────────────────
     try {
         await DB.init();
+        await DB.runMigration();
         
         // Auto-import data.json if DB is completely empty (For GitHub / fresh starts)
         const allW = await DB.getAllWords();
@@ -254,6 +258,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         await loadSettings();
         await updateDashboard();
+        renderCategoryTabs();
         showToast('Veritabanı hazır.', 'success');
     } catch (e) {
         showToast('Veritabanı başlatılamadı!', 'error');
@@ -733,6 +738,263 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 300);
     });
 
+    // ─── Category System ────────────────────────────────────
+    async function renderCategoryTabs() {
+        const tabsContainer = document.getElementById('category-tabs');
+        if (!tabsContainer) return;
+        const categories = await DB.getAllCategories();
+        const counts = await DB.getCategoryWordCounts();
+        const totalWords = allWords.length;
+
+        tabsContainer.innerHTML = '';
+        // "Tümü" tab
+        const allBtn = document.createElement('button');
+        allBtn.className = `btn btn-sm category-tab ${selectedCategoryId === 'all' ? 'selected' : ''}`;
+        allBtn.dataset.catId = 'all';
+        allBtn.style.fontSize = '0.8rem';
+        allBtn.textContent = `Tümü (${totalWords})`;
+        tabsContainer.appendChild(allBtn);
+
+        for (const cat of categories) {
+            const btn = document.createElement('button');
+            btn.className = `btn btn-sm category-tab ${selectedCategoryId == cat.id ? 'selected' : ''}`;
+            btn.dataset.catId = cat.id;
+            btn.style.fontSize = '0.8rem';
+            btn.innerHTML = `${cat.name} <span style="opacity:0.6">${counts[cat.id] || 0}</span>`;
+            tabsContainer.appendChild(btn);
+        }
+
+        // Tab click handler
+        tabsContainer.querySelectorAll('.category-tab').forEach(tab => {
+            tab.addEventListener('click', async () => {
+                selectedCategoryId = tab.dataset.catId;
+                tabsContainer.querySelectorAll('.category-tab').forEach(t => t.classList.remove('selected'));
+                tab.classList.add('selected');
+                await renderWordList(els.searchInput.value.trim());
+            });
+        });
+    }
+
+    // Override renderWordList to support category filter
+    const origRenderWordList = renderWordList;
+    renderWordList = async function(filter = '') {
+        if (selectedCategoryId !== 'all') {
+            const catWords = await DB.getWordsInCategory(Number(selectedCategoryId));
+            const catWordSet = new Set(catWords);
+            // Temporarily filter allWords
+            const origAllWords = allWords;
+            allWords = origAllWords.filter(w => catWordSet.has(w.word));
+            await origRenderWordList(filter);
+            allWords = origAllWords;
+        } else {
+            await origRenderWordList(filter);
+        }
+    };
+
+    async function renderCategoryManagement() {
+        const categories = await DB.getAllCategories();
+        const counts = await DB.getCategoryWordCounts();
+
+        // Render category list
+        const listEl = document.getElementById('category-list');
+        if (listEl) {
+            listEl.innerHTML = '';
+            for (const cat of categories) {
+                const div = document.createElement('div');
+                div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:var(--bg-glass);padding:10px 14px;border-radius:var(--radius-md);border:1px solid var(--border);';
+                div.innerHTML = `
+                    <span style="font-weight:500;">${cat.name} <span style="color:var(--text-muted);font-size:0.85rem;">(${counts[cat.id] || 0} kelime)</span></span>
+                    ${cat.isDefault ? '<span style="font-size:0.75rem;color:var(--text-muted);background:var(--bg-glass);padding:2px 8px;border-radius:4px;">Varsayılan</span>' : `<button class="btn btn-ghost btn-sm btn-delete-cat" data-cat-id="${cat.id}" style="color:var(--error);padding:4px 8px;"><i class="fa-solid fa-trash"></i></button>`}
+                `;
+                listEl.appendChild(div);
+            }
+
+            // Delete handlers
+            listEl.querySelectorAll('.btn-delete-cat').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    if (confirm('Bu kategoriyi silmek istediğinize emin misiniz?')) {
+                        await DB.deleteCategory(Number(btn.dataset.catId));
+                        showToast('Kategori silindi.', 'success');
+                        await renderCategoryManagement();
+                        await renderCategoryTabs();
+                    }
+                });
+            });
+        }
+
+        // Populate bulk-add select
+        const selectEl = document.getElementById('select-bulk-category');
+        if (selectEl) {
+            selectEl.innerHTML = '';
+            for (const cat of categories) {
+                const opt = document.createElement('option');
+                opt.value = cat.id;
+                opt.textContent = cat.name;
+                selectEl.appendChild(opt);
+            }
+        }
+    }
+
+    // Toggle panels
+    document.getElementById('btn-toggle-cat-panel')?.addEventListener('click', () => {
+        const panel = document.getElementById('cat-panel');
+        const icon = document.getElementById('btn-toggle-cat-panel').querySelector('i');
+        if (panel.style.display === 'none') {
+            panel.style.display = 'block';
+            icon.className = 'fa-solid fa-chevron-up';
+            renderCategoryManagement();
+        } else {
+            panel.style.display = 'none';
+            icon.className = 'fa-solid fa-chevron-down';
+        }
+    });
+
+    document.getElementById('btn-toggle-list-gen')?.addEventListener('click', () => {
+        const panel = document.getElementById('list-gen-panel');
+        const icon = document.getElementById('btn-toggle-list-gen').querySelector('i');
+        if (panel.style.display === 'none') {
+            panel.style.display = 'block';
+            icon.className = 'fa-solid fa-chevron-up';
+            renderListGenCategories();
+        } else {
+            panel.style.display = 'none';
+            icon.className = 'fa-solid fa-chevron-down';
+        }
+    });
+
+    // Add category
+    document.getElementById('btn-add-category')?.addEventListener('click', async () => {
+        const name = document.getElementById('input-new-category').value.trim();
+        if (!name) { showToast('Kategori adı girin.', 'error'); return; }
+        try {
+            await DB.addCategory(name);
+            document.getElementById('input-new-category').value = '';
+            showToast(`"${name}" kategorisi eklendi.`, 'success');
+            await renderCategoryManagement();
+            await renderCategoryTabs();
+        } catch (e) {
+            showToast('Bu kategori zaten var.', 'error');
+        }
+    });
+
+    // Bulk add words to category
+    document.getElementById('btn-bulk-add-to-category')?.addEventListener('click', async () => {
+        const catId = document.getElementById('select-bulk-category').value;
+        const text = document.getElementById('input-bulk-words').value.trim();
+        if (!catId || !text) { showToast('Kategori ve kelime listesi gerekli.', 'error'); return; }
+
+        const words = text.split('\n').map(w => w.trim()).filter(w => w.length > 0);
+        const result = await DB.addBulkWordsToCategory(words, Number(catId));
+        document.getElementById('input-bulk-words').value = '';
+        showToast(`${result.added.length} kelime eklendi. ${result.skipped.length} kelime atlandı (DB'de yok).`, 'success');
+        await renderCategoryManagement();
+        await renderCategoryTabs();
+    });
+
+    // ─── List Generator ─────────────────────────────────────
+    async function renderListGenCategories() {
+        const container = document.getElementById('list-gen-categories');
+        if (!container) return;
+        const categories = await DB.getAllCategories();
+        container.innerHTML = `<label style="color:var(--text-primary);font-size:0.85rem;"><input type="checkbox" class="lg-cat-check" value="all" checked> Tümü</label>`;
+        for (const cat of categories) {
+            container.innerHTML += `<label style="color:var(--text-primary);font-size:0.85rem;"><input type="checkbox" class="lg-cat-check" value="${cat.id}"> ${cat.name}</label>`;
+        }
+    }
+
+    document.getElementById('btn-generate-list')?.addEventListener('click', async () => {
+        const checkedCats = [...document.querySelectorAll('.lg-cat-check:checked')].map(c => c.value);
+        const countVal = document.getElementById('list-gen-count').value;
+
+        // Meaning count filters
+        const allowedMeaningCounts = [];
+        if (document.getElementById('lg-meaning-1')?.checked) allowedMeaningCounts.push(1);
+        if (document.getElementById('lg-meaning-2')?.checked) allowedMeaningCounts.push(2);
+        if (document.getElementById('lg-meaning-3')?.checked) allowedMeaningCounts.push(3);
+        if (document.getElementById('lg-meaning-4')?.checked) allowedMeaningCounts.push(4); // 4+ means >=4
+
+        // Get eligible words
+        let eligibleWords;
+        if (checkedCats.includes('all') || checkedCats.length === 0) {
+            eligibleWords = allWords.map(w => w.word);
+        } else {
+            const wordSets = await Promise.all(checkedCats.map(id => DB.getWordsInCategory(Number(id))));
+            const merged = new Set();
+            wordSets.forEach(ws => ws.forEach(w => merged.add(w)));
+            eligibleWords = [...merged];
+        }
+
+        // Group by meaning count and filter
+        const meaningsGrouped = await DB.getAllMeaningsGrouped();
+        const results = [];
+
+        for (const word of eligibleWords) {
+            const meanings = meaningsGrouped[word] || [];
+            if (meanings.length === 0) continue;
+
+            const mc = Math.min(meanings.length, 4); // cap at 4 for the filter
+            if (!allowedMeaningCounts.includes(mc)) continue;
+
+            for (const m of meanings) {
+                results.push({ word, meaningId: m.id });
+            }
+        }
+
+        // Shuffle
+        for (let i = results.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [results[i], results[j]] = [results[j], results[i]];
+        }
+
+        // Limit
+        let limited = results;
+        if (countVal !== 'all') {
+            const limit = parseInt(countVal);
+            limited = results.slice(0, limit);
+        }
+
+        // Output
+        const output = limited.map(r => `${r.word}:${r.meaningId}`).join('\n');
+        document.getElementById('list-gen-output').value = output;
+        showToast(`${limited.length} kelime-anlam çifti oluşturuldu.`, 'success');
+    });
+
+    document.getElementById('btn-copy-list')?.addEventListener('click', () => {
+        const text = document.getElementById('list-gen-output').value;
+        if (!text) { showToast('Önce liste oluşturun.', 'error'); return; }
+        navigator.clipboard.writeText(text).then(() => showToast('Liste panoya kopyalandı!', 'success'));
+    });
+
+    // ─── Practice Source Selector ────────────────────────────
+    async function renderPracticeCategoryCheckboxes() {
+        const container = document.getElementById('practice-category-checkboxes');
+        if (!container) return;
+        const categories = await DB.getAllCategories();
+        const counts = await DB.getCategoryWordCounts();
+        container.innerHTML = '';
+        for (const cat of categories) {
+            const label = document.createElement('label');
+            label.style.cssText = 'display:flex;align-items:center;gap:8px;color:var(--text-primary);font-size:0.9rem;cursor:pointer;padding:6px 0;';
+            label.innerHTML = `<input type="checkbox" class="practice-cat-check" value="${cat.id}"> ${cat.name} <span style="color:var(--text-muted);font-size:0.8rem;">(${counts[cat.id] || 0})</span>`;
+            container.appendChild(label);
+        }
+    }
+
+    document.getElementById('btn-source-all')?.addEventListener('click', () => {
+        practiceSource = 'all';
+        document.getElementById('btn-source-all').className = 'btn btn-primary btn-sm';
+        document.getElementById('btn-source-category').className = 'btn btn-secondary btn-sm';
+        document.getElementById('practice-category-select').style.display = 'none';
+    });
+
+    document.getElementById('btn-source-category')?.addEventListener('click', () => {
+        practiceSource = 'category';
+        document.getElementById('btn-source-category').className = 'btn btn-primary btn-sm';
+        document.getElementById('btn-source-all').className = 'btn btn-secondary btn-sm';
+        document.getElementById('practice-category-select').style.display = 'block';
+        renderPracticeCategoryCheckboxes();
+    });
+
     async function processWordList(isSlowMode) {
         const text = els.inputWordList.value;
         const list = text.split('\n').map(w => w.trim()).filter(w => w.length > 0);
@@ -881,6 +1143,86 @@ document.addEventListener('DOMContentLoaded', async () => {
         } finally {
             els.btnGenMissing.disabled = false;
             els.btnGenMissing.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Eksikleri Üret';
+        }
+    });
+
+    // Generate to ensure every meaning has at least 3 sentences
+    const btnMin3 = document.getElementById('btn-generate-min3');
+    btnMin3?.addEventListener('click', async () => {
+        btnMin3.disabled = true;
+        btnMin3.innerHTML = '<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span> Analiz ediliyor...';
+
+        try {
+            // Get all meanings grouped by word, and all sentence counts per meaningId
+            const allMeaningsGrouped = await DB.getAllMeaningsGrouped();
+            const allSentences = await DB.getAllSentences();
+
+            // Count sentences per meaningId
+            const sentenceCountPerMeaning = {};
+            for (const s of allSentences) {
+                if (s.meaningId) {
+                    sentenceCountPerMeaning[s.meaningId] = (sentenceCountPerMeaning[s.meaningId] || 0) + 1;
+                }
+            }
+
+            // Find words that have at least one meaning with < 3 sentences
+            const wordsToProcess = [];
+            for (const [word, meanings] of Object.entries(allMeaningsGrouped)) {
+                const needsMore = meanings.some(m => (sentenceCountPerMeaning[m.id] || 0) < 3);
+                if (needsMore) {
+                    // Calculate how many sentences to generate per meaning
+                    const neededPerMeaning = {};
+                    for (const m of meanings) {
+                        const current = sentenceCountPerMeaning[m.id] || 0;
+                        if (current < 3) {
+                            neededPerMeaning[m.id] = 3 - current;
+                        }
+                    }
+                    wordsToProcess.push({ word, meanings, neededPerMeaning });
+                }
+            }
+
+            if (wordsToProcess.length === 0) {
+                showToast('Tüm anlamların en az 3 cümlesi var! 🎉', 'success');
+                btnMin3.disabled = false;
+                btnMin3.innerHTML = '<i class="fa-solid fa-fill-drip"></i> Min 3\'e Tamamla';
+                return;
+            }
+
+            showToast(`${wordsToProcess.length} kelimede eksik cümleler bulundu. Üretim başlıyor...`, 'info');
+
+            for (let i = 0; i < wordsToProcess.length; i++) {
+                const item = wordsToProcess[i];
+                btnMin3.innerHTML = `<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span> ${item.word} (${i + 1}/${wordsToProcess.length})`;
+
+                try {
+                    // For each meaning that needs more sentences, generate the difference
+                    const maxNeeded = Math.max(...Object.values(item.neededPerMeaning));
+                    const dictData = { word: item.word, meanings: item.meanings };
+                    await startDictionaryTranslationProcess([dictData], maxNeeded);
+
+                    if (i < wordsToProcess.length - 1) {
+                        btnMin3.innerHTML = `<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span> 2s bekleniyor... (${i + 1}/${wordsToProcess.length})`;
+                        await new Promise(r => setTimeout(r, 2000));
+                    }
+                } catch (e) {
+                    console.error(`Error generating for ${item.word}:`, e);
+                    if (i < wordsToProcess.length - 1) {
+                        await new Promise(r => setTimeout(r, 2000));
+                    }
+                }
+            }
+
+            showToast('Tüm eksik cümleler tamamlandı! 🎉', 'success');
+            sentenceCounts = await DB.getAllSentenceCounts();
+            await updateDashboard();
+            renderWordList();
+
+        } catch (e) {
+            showToast('Hata: ' + e.message, 'error');
+        } finally {
+            btnMin3.disabled = false;
+            btnMin3.innerHTML = '<i class="fa-solid fa-fill-drip"></i> Min 3\'e Tamamla';
         }
     });
     
@@ -1347,9 +1689,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     els.btnStartCustomPractice.addEventListener('click', async () => {
         const text = els.inputCustomPracticeList.value;
-        const list = text.split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length > 0);
+        const rawLines = text.split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length > 0);
         
-        if (list.length === 0) {
+        if (rawLines.length === 0) {
             showToast('Lütfen pratik yapmak için kelime girin.', 'error');
             return;
         }
@@ -1358,20 +1700,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnStartCustomPractice.innerHTML = '<span class="spinner" style="width:16px;height:16px;"></span> Analiz ediliyor...';
 
         try {
-            await DB.addWords(list);
-            await updateDashboard();
+            // Check if word:meaningId format
+            const hasIds = rawLines.some(l => l.includes(':'));
+            
+            if (hasIds) {
+                // Parse word:meaningId pairs — start session with specific meanings
+                const pairs = rawLines.map(l => {
+                    const [word, mId] = l.split(':');
+                    return { word: word.trim(), meaningId: mId ? mId.trim() : null };
+                }).filter(p => p.word);
 
-            // Check if any word has ZERO sentences (we only require 1 now to start)
-            const missing = list.filter(w => (sentenceCounts[w] || 0) < 1);
+                const uniqueWords = [...new Set(pairs.map(p => p.word))];
+                const meaningIdSet = new Set(pairs.filter(p => p.meaningId).map(p => p.meaningId));
 
-            if (missing.length > 0) {
-                els.modalCustomPractice.classList.remove('visible');
-                showToast(`${missing.length} kelime için eksik cümleler üretiliyor...`, 'info');
-                // Request generation, but default to 1 sentence minimally required to get started quickly
-                await generateAndStartCustomSession(missing, list);
+                // Start session with these specific meanings
+                await startSessionWithSpecificMeanings(uniqueWords, meaningIdSet);
             } else {
-                els.modalCustomPractice.classList.remove('visible');
-                startSessionWithSpecificList(list);
+                // Regular word-only list (existing behavior)
+                const list = rawLines;
+                await DB.addWords(list);
+                await updateDashboard();
+
+                const missing = list.filter(w => (sentenceCounts[w] || 0) < 1);
+
+                if (missing.length > 0) {
+                    els.modalCustomPractice.classList.remove('visible');
+                    showToast(`${missing.length} kelime için eksik cümleler üretiliyor...`, 'info');
+                    await generateAndStartCustomSession(missing, list);
+                } else {
+                    els.modalCustomPractice.classList.remove('visible');
+                    startSessionWithSpecificList(list);
+                }
             }
         } catch(e) {
             showToast('Hata: ' + e.message, 'error');
@@ -1380,6 +1739,70 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.btnStartCustomPractice.innerHTML = 'Analiz Et ve Başla';
         }
     });
+
+    // Start session with specific word:meaningId pairs
+    async function startSessionWithSpecificMeanings(words, meaningIdSet) {
+        const readyMeaningsMap = new Map();
+        const allSentencesGrouped = await DB.getAllSentencesGrouped();
+        const allMeaningsMap = await DB.getAllMeaningsGrouped();
+
+        for (const word of words) {
+            const sentences = allSentencesGrouped[word] || [];
+            const wordMeanings = allMeaningsMap[word] || [];
+
+            const meaningGroups = {};
+            sentences.forEach(s => {
+                const mId = s.meaningId;
+                if (!mId) return;
+                // Only include meanings in our set (if set is not empty)
+                if (meaningIdSet.size > 0 && !meaningIdSet.has(mId.toString())) return;
+                if (!meaningGroups[mId]) meaningGroups[mId] = [];
+
+                let meaningData = wordMeanings.find(m => m.id.toString() === mId.toString());
+                if (!meaningData && wordMeanings.length > 0) meaningData = wordMeanings[0];
+                s.englishDefinition = meaningData ? meaningData.definition : "Anlam bulunamadı";
+
+                meaningGroups[mId].push(s);
+            });
+
+            for (const [mId, sList] of Object.entries(meaningGroups)) {
+                if (sList.length >= 1) {
+                    readyMeaningsMap.set(mId, sList);
+                }
+            }
+        }
+
+        if (readyMeaningsMap.size === 0) {
+            showToast('Bu kelime-anlam çiftleri için yeterli cümle bulunamadı.', 'error');
+            return;
+        }
+
+        els.modalCustomPractice.classList.remove('visible');
+
+        if (practiceMode === 'reading') {
+            currentSession = new ReadingSessionManager(readyMeaningsMap, 1);
+        } else if (practiceMode === 'mixed') {
+            currentSession = new SessionManager(readyMeaningsMap, 1);
+        } else if (practiceMode === 'warmup') {
+            currentSession = new WarmUpSessionManager(readyMeaningsMap, 1);
+        } else if (practiceMode === 'speaking') {
+            currentSession = new SpeakingSessionManager([...readyMeaningsMap.keys()], readyMeaningsMap);
+        } else {
+            currentSession = new SessionManager(readyMeaningsMap, 1);
+        }
+
+        resetGamification();
+
+        els.practiceSetup.style.display = 'none';
+        els.practiceComplete.style.display = 'none';
+        els.practiceActive.style.display = 'block';
+
+        const prog = currentSession.getProgress();
+        els.progTotal.textContent = prog.totalWords;
+
+        document.querySelector('[data-target="view-practice"]').click();
+        loadNextCard();
+    }
 
     async function generateAndStartCustomSession(missingWords, targetList) {
         const apiKey = await DB.getSetting('gemini_api_key');
@@ -1651,11 +2074,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
         const readyMeaningsMap = new Map();
         
+        // Get words to practice based on source selection
+        let wordsToUse = allWords;
+        if (practiceSource === 'category') {
+            const checkedBoxes = document.querySelectorAll('.practice-cat-check:checked');
+            const selectedCatIds = [...checkedBoxes].map(c => Number(c.value));
+            if (selectedCatIds.length > 0) {
+                const wordSets = await Promise.all(selectedCatIds.map(id => DB.getWordsInCategory(id)));
+                const mergedWords = new Set();
+                wordSets.forEach(ws => ws.forEach(w => mergedWords.add(w)));
+                wordsToUse = allWords.filter(w => mergedWords.has(w.word));
+            }
+        }
+        
         // Batch load ALL sentences and meanings in just 2 queries (instead of 24K+)
         const allSentencesGrouped = await DB.getAllSentencesGrouped();
         const allMeaningsMap = await DB.getAllMeaningsGrouped();
         
-        for (const w of allWords) {
+        for (const w of wordsToUse) {
             const word = w.word;
             const sentences = allSentencesGrouped[word] || [];
             const wordMeanings = allMeaningsMap[word] || [];

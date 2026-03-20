@@ -2,7 +2,14 @@
 const DB = {
     db: null,
     DB_NAME: 'prettymaya',
-    DB_VERSION: 3,
+    DB_VERSION: 4,
+
+    DEFAULT_CATEGORIES: [
+        { id: 1, name: 'v1 API', isDefault: true },
+        { id: 2, name: 'v2 API', isDefault: true },
+        { id: 3, name: 'Wiktionary', isDefault: true },
+        { id: 4, name: 'AI Üretimi', isDefault: true }
+    ],
 
     async init() {
         return new Promise((resolve, reject) => {
@@ -16,20 +23,21 @@ const DB = {
 
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
+                const tx = event.target.transaction;
 
-                // Words store (added audio field)
+                // Words store
                 if (!db.objectStoreNames.contains('words')) {
                     const wordStore = db.createObjectStore('words', { keyPath: 'word' });
                     wordStore.createIndex('addedDate', 'addedDate', { unique: false });
                 }
 
-                // Meanings store (New in v3) - Holds definitions from Dictionary API
+                // Meanings store
                 if (!db.objectStoreNames.contains('meanings')) {
                     const meaningStore = db.createObjectStore('meanings', { keyPath: 'id', autoIncrement: true });
                     meaningStore.createIndex('word', 'word', { unique: false });
                 }
 
-                // Sentences store (Updated in v3 to include meaningId and source)
+                // Sentences store
                 if (!db.objectStoreNames.contains('sentences')) {
                     const sentenceStore = db.createObjectStore('sentences', { keyPath: 'id', autoIncrement: true });
                     sentenceStore.createIndex('word', 'word', { unique: false });
@@ -46,8 +54,79 @@ const DB = {
                     const historyStore = db.createObjectStore('history', { keyPath: 'id', autoIncrement: true });
                     historyStore.createIndex('date', 'date', { unique: false });
                 }
+
+                // ─── v4: Categories ─────────────────────────────────
+                if (!db.objectStoreNames.contains('categories')) {
+                    const catStore = db.createObjectStore('categories', { keyPath: 'id', autoIncrement: true });
+                    catStore.createIndex('name', 'name', { unique: true });
+                }
+
+                if (!db.objectStoreNames.contains('word_categories')) {
+                    const wcStore = db.createObjectStore('word_categories', { keyPath: 'id', autoIncrement: true });
+                    wcStore.createIndex('word', 'word', { unique: false });
+                    wcStore.createIndex('categoryId', 'categoryId', { unique: false });
+                    wcStore.createIndex('word_category', ['word', 'categoryId'], { unique: true });
+                }
             };
         });
+    },
+
+    // Run after init — seeds default categories and migrates existing data
+    async runMigration() {
+        const cats = await this.getAllCategories();
+        if (cats.length === 0) {
+            // Seed default categories
+            const tx = this.db.transaction('categories', 'readwrite');
+            const store = tx.objectStore('categories');
+            for (const c of this.DEFAULT_CATEGORIES) {
+                store.put({ ...c, createdDate: new Date().toISOString() });
+            }
+            await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+
+            // Auto-categorize existing words based on meaning tags
+            await this.autoCategorizeAllWords();
+        }
+    },
+
+    async autoCategorizeAllWords() {
+        const allMeanings = await this.getAllMeanings();
+        const wordCatMap = {}; // { word: Set<categoryId> }
+
+        for (const m of allMeanings) {
+            const def = m.definition || '';
+            if (!wordCatMap[m.word]) wordCatMap[m.word] = new Set();
+
+            if (def.includes('[v1]')) wordCatMap[m.word].add(1);
+            if (def.includes('[v2]')) wordCatMap[m.word].add(2);
+            if (def.includes('[Wiki]')) wordCatMap[m.word].add(3);
+            if (def.includes('[🤖 AI]') || def.includes('(🤖 AI Üretimi)')) wordCatMap[m.word].add(4);
+        }
+
+        const tx = this.db.transaction('word_categories', 'readwrite');
+        const store = tx.objectStore('word_categories');
+        for (const [word, catIds] of Object.entries(wordCatMap)) {
+            for (const catId of catIds) {
+                try {
+                    store.add({ word, categoryId: catId });
+                } catch (e) { /* duplicate, skip */ }
+            }
+        }
+        await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+    },
+
+    // Auto-categorize a single word based on its meanings
+    async autoCategorizeWord(word, meanings) {
+        const catIds = new Set();
+        for (const m of meanings) {
+            const def = m.definition || '';
+            if (def.includes('[v1]')) catIds.add(1);
+            if (def.includes('[v2]')) catIds.add(2);
+            if (def.includes('[Wiki]')) catIds.add(3);
+            if (def.includes('[🤖 AI]') || def.includes('(🤖 AI Üretimi)')) catIds.add(4);
+        }
+        for (const catId of catIds) {
+            try { await this.addWordToCategory(word, catId); } catch (e) { /* already exists */ }
+        }
     },
 
     // ─── Words ───────────────────────────────────────────────
@@ -104,7 +183,7 @@ const DB = {
     },
 
     async deleteWord(word) {
-        const tx = this.db.transaction(['words', 'sentences', 'meanings'], 'readwrite');
+        const tx = this.db.transaction(['words', 'sentences', 'meanings', 'word_categories'], 'readwrite');
         tx.objectStore('words').delete(word);
 
         // Delete associated sentences
@@ -113,10 +192,7 @@ const DB = {
         const sReq = sIndex.openCursor(IDBKeyRange.only(word));
         sReq.onsuccess = (event) => {
             const cursor = event.target.result;
-            if (cursor) {
-                cursor.delete();
-                cursor.continue();
-            }
+            if (cursor) { cursor.delete(); cursor.continue(); }
         };
 
         // Delete associated meanings
@@ -125,10 +201,16 @@ const DB = {
         const mReq = mIndex.openCursor(IDBKeyRange.only(word));
         mReq.onsuccess = (event) => {
             const cursor = event.target.result;
-            if (cursor) {
-                cursor.delete();
-                cursor.continue();
-            }
+            if (cursor) { cursor.delete(); cursor.continue(); }
+        };
+
+        // Delete word-category mappings
+        const wcStore = tx.objectStore('word_categories');
+        const wcIndex = wcStore.index('word');
+        const wcReq = wcIndex.openCursor(IDBKeyRange.only(word));
+        wcReq.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (cursor) { cursor.delete(); cursor.continue(); }
         };
 
         return new Promise((resolve, reject) => {
@@ -138,10 +220,11 @@ const DB = {
     },
 
     async deleteAllWords() {
-        const tx = this.db.transaction(['words', 'sentences', 'meanings'], 'readwrite');
+        const tx = this.db.transaction(['words', 'sentences', 'meanings', 'word_categories'], 'readwrite');
         tx.objectStore('words').clear();
         tx.objectStore('sentences').clear();
         tx.objectStore('meanings').clear();
+        tx.objectStore('word_categories').clear();
         return new Promise((resolve, reject) => {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
@@ -269,6 +352,10 @@ const DB = {
             });
             addedIds.push(id);
         }
+
+        // Auto-categorize this word based on new meanings
+        await this.autoCategorizeWord(word, meanings);
+
         return addedIds;
     },
 
@@ -353,6 +440,147 @@ const DB = {
         });
     },
 
+    // ─── Categories ───────────────────────────────────────────
+    async getAllCategories() {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('categories', 'readonly');
+            const store = tx.objectStore('categories');
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async addCategory(name) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('categories', 'readwrite');
+            const store = tx.objectStore('categories');
+            const req = store.add({ name, isDefault: false, createdDate: new Date().toISOString() });
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async deleteCategory(id) {
+        // Delete category + all its word_categories mappings
+        const tx = this.db.transaction(['categories', 'word_categories'], 'readwrite');
+        tx.objectStore('categories').delete(Number(id));
+
+        const wcStore = tx.objectStore('word_categories');
+        const wcIndex = wcStore.index('categoryId');
+        const wcReq = wcIndex.openCursor(IDBKeyRange.only(Number(id)));
+        wcReq.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (cursor) { cursor.delete(); cursor.continue(); }
+        };
+
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    },
+
+    async addWordToCategory(word, categoryId) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('word_categories', 'readwrite');
+            const store = tx.objectStore('word_categories');
+            const req = store.add({ word, categoryId: Number(categoryId) });
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async removeWordFromCategory(word, categoryId) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('word_categories', 'readwrite');
+            const store = tx.objectStore('word_categories');
+            const index = store.index('word_category');
+            const req = index.openCursor(IDBKeyRange.only([word, Number(categoryId)]));
+            req.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) cursor.delete();
+            };
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    },
+
+    async getWordsInCategory(categoryId) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('word_categories', 'readonly');
+            const store = tx.objectStore('word_categories');
+            const index = store.index('categoryId');
+            const req = index.getAll(IDBKeyRange.only(Number(categoryId)));
+            req.onsuccess = () => resolve((req.result || []).map(r => r.word));
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async getCategoriesForWord(word) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('word_categories', 'readonly');
+            const store = tx.objectStore('word_categories');
+            const index = store.index('word');
+            const req = index.getAll(IDBKeyRange.only(word));
+            req.onsuccess = () => resolve((req.result || []).map(r => r.categoryId));
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async addBulkWordsToCategory(words, categoryId) {
+        // Only adds words that exist in the DB, silently skips unknown ones
+        const allWords = await this.getAllWords();
+        const wordSet = new Set(allWords.map(w => w.word));
+        const added = [];
+        const skipped = [];
+
+        const tx = this.db.transaction('word_categories', 'readwrite');
+        const store = tx.objectStore('word_categories');
+
+        for (const word of words) {
+            const clean = word.trim().toLowerCase();
+            if (!clean) continue;
+            if (!wordSet.has(clean)) { skipped.push(clean); continue; }
+            try {
+                store.add({ word: clean, categoryId: Number(categoryId) });
+                added.push(clean);
+            } catch (e) { /* duplicate, skip */ }
+        }
+
+        await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+        return { added, skipped };
+    },
+
+    async getCategoryWordCounts() {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('word_categories', 'readonly');
+            const store = tx.objectStore('word_categories');
+            const index = store.index('categoryId');
+            const counts = {};
+            const req = index.openKeyCursor();
+            req.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    counts[cursor.key] = (counts[cursor.key] || 0) + 1;
+                    cursor.continue();
+                } else {
+                    resolve(counts);
+                }
+            };
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async getAllWordCategories() {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('word_categories', 'readonly');
+            const store = tx.objectStore('word_categories');
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
     // ─── Settings ────────────────────────────────────────────
     async getSetting(key) {
         return new Promise((resolve, reject) => {
@@ -401,31 +629,24 @@ const DB = {
     // ─── Import / Export ─────────────────────────────────────
     async exportAll() {
         const words = await this.getAllWords();
-        
-        const txS = this.db.transaction('sentences', 'readonly');
-        const sentenceStore = txS.objectStore('sentences');
-        const sentences = await new Promise((res, rej) => {
-            const req = sentenceStore.getAll();
-            req.onsuccess = () => res(req.result);
-            req.onerror = () => rej(req.error);
-        });
-
-        const txM = this.db.transaction('meanings', 'readonly');
-        const meaningStore = txM.objectStore('meanings');
-        const meanings = await new Promise((res, rej) => {
-            const req = meaningStore.getAll();
-            req.onsuccess = () => res(req.result);
-            req.onerror = () => rej(req.error);
-        });
-
+        const sentences = await this.getAllSentences();
+        const meanings = await this.getAllMeanings();
         const history = await this.getSessionHistory();
+        const categories = await this.getAllCategories();
+        const wordCategories = await this.getAllWordCategories();
 
-        return { words, sentences, meanings, history, exportDate: new Date().toISOString() };
+        return { words, sentences, meanings, history, categories, wordCategories, exportDate: new Date().toISOString() };
     },
 
     async importAll(data) {
         // Clear existing data
         await this.deleteAllWords();
+
+        // Also clear categories + word_categories
+        const txCat = this.db.transaction(['categories', 'word_categories'], 'readwrite');
+        txCat.objectStore('categories').clear();
+        txCat.objectStore('word_categories').clear();
+        await new Promise((res, rej) => { txCat.oncomplete = () => res(); txCat.onerror = () => rej(txCat.error); });
 
         // Import words
         if (data.words && data.words.length > 0) {
@@ -435,11 +656,11 @@ const DB = {
             await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
         }
 
-        // Import meanings (Must preserve IDs so sentences can map meaningId correctly!)
+        // Import meanings
         if (data.meanings && data.meanings.length > 0) {
             const tx = this.db.transaction('meanings', 'readwrite');
             const store = tx.objectStore('meanings');
-            for (const m of data.meanings) store.add(m); // Keep explicit id 
+            for (const m of data.meanings) store.add(m);
             await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
         }
 
@@ -447,8 +668,35 @@ const DB = {
         if (data.sentences && data.sentences.length > 0) {
             const tx = this.db.transaction('sentences', 'readwrite');
             const store = tx.objectStore('sentences');
-            for (const s of data.sentences) store.add(s); // Keep explicit id
+            for (const s of data.sentences) store.add(s);
             await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+        }
+
+        // Import categories
+        if (data.categories && data.categories.length > 0) {
+            const tx = this.db.transaction('categories', 'readwrite');
+            const store = tx.objectStore('categories');
+            for (const c of data.categories) store.put(c);
+            await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+        } else {
+            // No categories in export — seed defaults
+            const tx = this.db.transaction('categories', 'readwrite');
+            const store = tx.objectStore('categories');
+            for (const c of this.DEFAULT_CATEGORIES) {
+                store.put({ ...c, createdDate: new Date().toISOString() });
+            }
+            await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+        }
+
+        // Import word_categories
+        if (data.wordCategories && data.wordCategories.length > 0) {
+            const tx = this.db.transaction('word_categories', 'readwrite');
+            const store = tx.objectStore('word_categories');
+            for (const wc of data.wordCategories) store.add(wc);
+            await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+        } else {
+            // No word_categories in export — auto-categorize
+            await this.autoCategorizeAllWords();
         }
     }
 };

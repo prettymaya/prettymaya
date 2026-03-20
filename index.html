@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" href="icon.png">
     <!-- Icons: FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="css/style.css?v=38">
+    <link rel="stylesheet" href="css/style.css?v=39">
 </head>
 <body>
 
@@ -105,7 +105,7 @@
                 <div class="card">
                     <div class="card-header" style="flex-direction: column; align-items: stretch; gap: 16px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                            <h3 class="card-title">Tüm Kelimeler</h3>
+                            <h3 class="card-title">Kelimeler</h3>
                             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                                 <button class="btn btn-sm" id="btn-cleanup-meanings" style="background-color: var(--error); color: white;" title="Cümlesi olmayan (boş) tüm anlamları veritabanından kalıcı siler">
                                     <i class="fa-solid fa-trash-can"></i> Fazlalıkları Sil
@@ -116,6 +116,9 @@
                                 <button class="btn btn-primary btn-sm" id="btn-generate-missing">
                                     <i class="fa-solid fa-wand-magic-sparkles"></i> Eksikleri Üret
                                 </button>
+                                <button class="btn btn-primary btn-sm" id="btn-generate-min3" style="background-color: var(--success); color: white;" title="Her anlam için minimum 3 cümle olacak şekilde eksik cümleleri üretir">
+                                    <i class="fa-solid fa-fill-drip"></i> Min 3'e Tamamla
+                                </button>
                                 <button class="btn btn-secondary btn-sm" id="btn-show-add-modal">
                                     <i class="fa-solid fa-plus"></i> Ekle
                                 </button>
@@ -125,6 +128,12 @@
                         <div class="search-wrapper">
                             <i class="fa-solid fa-magnifying-glass search-icon"></i>
                             <input type="text" id="input-search-words" placeholder="Kelime ara...">
+                        </div>
+
+                        <!-- Category Filter Tabs -->
+                        <div id="category-tabs" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+                            <button class="btn btn-sm category-tab selected" data-cat-id="all" style="font-size: 0.8rem;">Tümü</button>
+                            <!-- JS ile doldurulacak -->
                         </div>
                     </div>
 
@@ -144,6 +153,69 @@
                                 <!-- JS ile doldurulacak -->
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- Category Management -->
+                <div class="card" style="margin-top: 20px;">
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="fa-solid fa-folder" style="color: var(--accent-purple-light); margin-right: 8px;"></i>Kategori Yönetimi</h3>
+                        <button class="btn btn-ghost btn-sm" id="btn-toggle-cat-panel" title="Aç/Kapat"><i class="fa-solid fa-chevron-down"></i></button>
+                    </div>
+                    <div id="cat-panel" style="display: none;">
+                        <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+                            <input type="text" id="input-new-category" placeholder="Yeni kategori adı..." style="flex: 1; min-width: 150px;">
+                            <button class="btn btn-primary btn-sm" id="btn-add-category"><i class="fa-solid fa-plus"></i> Ekle</button>
+                        </div>
+                        <div id="category-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+                            <!-- JS ile doldurulacak -->
+                        </div>
+                        <div style="border-top: 1px solid var(--border); padding-top: 16px;">
+                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px;">Kategoriye toplu kelime ekle:</p>
+                            <select id="select-bulk-category" style="width: 100%; padding: 10px; background: var(--bg-glass); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 8px; font-family: inherit;">
+                                <!-- JS ile doldurulacak -->
+                            </select>
+                            <textarea id="input-bulk-words" placeholder="Her satıra bir kelime yazın... (Veritabanında olmayan kelimeler otomatik atlanır)" style="min-height: 80px; margin-bottom: 8px;"></textarea>
+                            <button class="btn btn-primary btn-sm" id="btn-bulk-add-to-category" style="width: 100%;"><i class="fa-solid fa-folder-plus"></i> Kategoriye Ekle</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Liste Oluşturucu -->
+                <div class="card" style="margin-top: 20px;">
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="fa-solid fa-list-check" style="color: var(--success); margin-right: 8px;"></i>Liste Oluşturucu</h3>
+                        <button class="btn btn-ghost btn-sm" id="btn-toggle-list-gen" title="Aç/Kapat"><i class="fa-solid fa-chevron-down"></i></button>
+                    </div>
+                    <div id="list-gen-panel" style="display: none;">
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">Seçtiğin kategorilerden rastgele kelime + anlam ID'si listesi üret. Bu listeyi Pratik > Özel Liste'ye yapıştırabilirsin.</p>
+                        <div style="margin-bottom: 12px;">
+                            <label style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px; display: block;">Kategoriler:</label>
+                            <div id="list-gen-categories" style="display: flex; gap: 8px; flex-wrap: wrap;"></div>
+                        </div>
+                        <div style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 120px;">
+                                <label style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px; display: block;">Kelime Sayısı:</label>
+                                <select id="list-gen-count" style="width: 100%; padding: 10px; background: var(--bg-glass); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius-md); font-family: inherit;">
+                                    <option value="100">100</option>
+                                    <option value="400" selected>400</option>
+                                    <option value="1000">1000</option>
+                                    <option value="all">Tümü</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 120px;">
+                                <label style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px; display: block;">Anlam Sayısı Filtresi:</label>
+                                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                    <label style="color: var(--text-primary); font-size: 0.85rem;"><input type="checkbox" id="lg-meaning-1" checked> 1</label>
+                                    <label style="color: var(--text-primary); font-size: 0.85rem;"><input type="checkbox" id="lg-meaning-2" checked> 2</label>
+                                    <label style="color: var(--text-primary); font-size: 0.85rem;"><input type="checkbox" id="lg-meaning-3" checked> 3</label>
+                                    <label style="color: var(--text-primary); font-size: 0.85rem;"><input type="checkbox" id="lg-meaning-4" checked> 4+</label>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-success btn-sm" id="btn-generate-list" style="width: 100%; margin-bottom: 12px;"><i class="fa-solid fa-shuffle"></i> Liste Oluştur</button>
+                        <textarea id="list-gen-output" readonly placeholder="Oluşturulan liste burada görünecek..." style="min-height: 100px; font-family: monospace; font-size: 0.85rem;"></textarea>
+                        <button class="btn btn-secondary btn-sm" id="btn-copy-list" style="width: 100%; margin-top: 8px;"><i class="fa-solid fa-copy"></i> Kopyala</button>
                     </div>
                 </div>
             </section>
@@ -170,7 +242,23 @@
                             <button class="word-count-btn" data-count="100">100</button>
                             <button class="word-count-btn" data-count="200">200</button>
                             <button class="word-count-btn" data-count="400">400</button>
+                            <button class="word-count-btn" data-count="1000">1000</button>
                             <button class="word-count-btn" data-count="all">Tümü</button>
+                        </div>
+
+                        <!-- Kaynak Seçimi: Kategori veya Tüm -->
+                        <div class="card-header" style="justify-content: center; margin-top: 16px;">
+                            <h3 class="card-title"><i class="fa-solid fa-folder-open" style="color: var(--success); margin-right: 8px;"></i>Kaynak</h3>
+                        </div>
+                        <div id="practice-source-selector" style="margin-bottom: 16px;">
+                            <div style="display: flex; gap: 8px; margin-bottom: 12px; justify-content: center;">
+                                <button class="btn btn-primary btn-sm" id="btn-source-all">Tüm Kelimeler</button>
+                                <button class="btn btn-secondary btn-sm" id="btn-source-category"><i class="fa-solid fa-folder"></i> Kategoriden Seç</button>
+                            </div>
+                            <div id="practice-category-select" style="display: none; background: var(--bg-glass); border-radius: var(--radius-md); padding: 16px; border: 1px solid var(--border);">
+                                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px;">Pratik yapmak istediğin kategorileri seç:</p>
+                                <div id="practice-category-checkboxes" style="display: flex; flex-direction: column; gap: 8px;"></div>
+                            </div>
                         </div>
                         
                         <div class="card-header" style="justify-content: center; margin-top: 16px;">
@@ -650,11 +738,11 @@
     <div class="toast-container" id="toast-container"></div>
 
     <!-- Scripts -->
-    <script src="js/db.js?v=38"></script>
-    <script src="js/sync.js?v=38"></script>
-    <script src="js/dictionary.js?v=38"></script>
-    <script src="js/gemini.js?v=38"></script>
-    <script src="js/session.js?v=38"></script>
-    <script src="js/app.js?v=38"></script>
+    <script src="js/db.js?v=39"></script>
+    <script src="js/sync.js?v=39"></script>
+    <script src="js/dictionary.js?v=39"></script>
+    <script src="js/gemini.js?v=39"></script>
+    <script src="js/session.js?v=39"></script>
+    <script src="js/app.js?v=39"></script>
 </body>
 </html>
