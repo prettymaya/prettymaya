@@ -2,7 +2,7 @@
 const DB = {
     db: null,
     DB_NAME: 'prettymaya',
-    DB_VERSION: 4,
+    DB_VERSION: 5,
 
     DEFAULT_CATEGORIES: [
         { id: 1, name: 'v1 API', isDefault: true },
@@ -25,6 +25,13 @@ const DB = {
                 const db = event.target.result;
                 const tx = event.target.transaction;
 
+                // Helper: safely add index if not exists
+                const ensureIndex = (store, name, keyPath, options) => {
+                    if (!store.indexNames.contains(name)) {
+                        store.createIndex(name, keyPath, options || {});
+                    }
+                };
+
                 // Words store
                 if (!db.objectStoreNames.contains('words')) {
                     const wordStore = db.createObjectStore('words', { keyPath: 'word' });
@@ -35,6 +42,9 @@ const DB = {
                 if (!db.objectStoreNames.contains('meanings')) {
                     const meaningStore = db.createObjectStore('meanings', { keyPath: 'id', autoIncrement: true });
                     meaningStore.createIndex('word', 'word', { unique: false });
+                } else {
+                    const meaningStore = tx.objectStore('meanings');
+                    ensureIndex(meaningStore, 'word', 'word', { unique: false });
                 }
 
                 // Sentences store
@@ -42,6 +52,11 @@ const DB = {
                     const sentenceStore = db.createObjectStore('sentences', { keyPath: 'id', autoIncrement: true });
                     sentenceStore.createIndex('word', 'word', { unique: false });
                     sentenceStore.createIndex('meaningId', 'meaningId', { unique: false });
+                } else {
+                    // Ensure indexes exist on existing store (critical for v3→v5 upgrades)
+                    const sentenceStore = tx.objectStore('sentences');
+                    ensureIndex(sentenceStore, 'word', 'word', { unique: false });
+                    ensureIndex(sentenceStore, 'meaningId', 'meaningId', { unique: false });
                 }
 
                 // Settings store
@@ -55,10 +70,13 @@ const DB = {
                     historyStore.createIndex('date', 'date', { unique: false });
                 }
 
-                // ─── v4: Categories ─────────────────────────────────
+                // ─── v4/v5: Categories ─────────────────────────────────
                 if (!db.objectStoreNames.contains('categories')) {
                     const catStore = db.createObjectStore('categories', { keyPath: 'id', autoIncrement: true });
                     catStore.createIndex('name', 'name', { unique: true });
+                } else {
+                    const catStore = tx.objectStore('categories');
+                    ensureIndex(catStore, 'name', 'name', { unique: true });
                 }
 
                 if (!db.objectStoreNames.contains('word_categories')) {
@@ -66,6 +84,11 @@ const DB = {
                     wcStore.createIndex('word', 'word', { unique: false });
                     wcStore.createIndex('categoryId', 'categoryId', { unique: false });
                     wcStore.createIndex('word_category', ['word', 'categoryId'], { unique: true });
+                } else {
+                    const wcStore = tx.objectStore('word_categories');
+                    ensureIndex(wcStore, 'word', 'word', { unique: false });
+                    ensureIndex(wcStore, 'categoryId', 'categoryId', { unique: false });
+                    ensureIndex(wcStore, 'word_category', ['word', 'categoryId'], { unique: true });
                 }
             };
         });
