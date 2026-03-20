@@ -489,15 +489,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         reader.onload = async (ev) => {
             try {
                 els.inputImportDb.disabled = true;
-                showToast('Yedek yükleniyor...', 'info');
+                showToast('Yedek yükleniyor... Bu büyük veritabanlarında 10-30 saniye sürebilir.', 'info');
                 const data = JSON.parse(ev.target.result);
+                
+                if (!data.words || !Array.isArray(data.words)) {
+                    showToast('Geçersiz dosya formatı: words dizisi bulunamadı.', 'error');
+                    return;
+                }
+                
                 await DB.importAll(data);
                 await updateDashboard();
+                await renderCategoryTabs();
                 renderWordList();
-                showToast('Yedek başarıyla geri yüklendi!', 'success');
+                showToast(`Yedek başarıyla yüklendi! ${data.words.length} kelime, ${(data.meanings||[]).length} anlam, ${(data.sentences||[]).length} cümle.`, 'success');
             } catch(error) {
-                showToast('Geri yükleme hatası: Geçersiz dosya.', 'error');
-                console.error(error);
+                showToast('Geri yükleme hatası: ' + error.message, 'error');
+                console.error('Import error:', error);
             } finally {
                 els.inputImportDb.disabled = false;
                 els.inputImportDb.value = ''; // reset input

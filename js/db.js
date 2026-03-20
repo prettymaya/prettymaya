@@ -659,28 +659,39 @@ const DB = {
         txCat.objectStore('word_categories').clear();
         await new Promise((res, rej) => { txCat.oncomplete = () => res(); txCat.onerror = () => rej(txCat.error); });
 
+        // Helper: chunk array into batches
+        const chunkArray = (arr, size) => {
+            const chunks = [];
+            for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+            return chunks;
+        };
+
         // Import words
         if (data.words && data.words.length > 0) {
             const tx = this.db.transaction('words', 'readwrite');
             const store = tx.objectStore('words');
-            for (const w of data.words) store.add(w);
+            for (const w of data.words) store.put(w);
             await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
         }
 
-        // Import meanings
+        // Import meanings (use put to handle existing ids)
         if (data.meanings && data.meanings.length > 0) {
-            const tx = this.db.transaction('meanings', 'readwrite');
-            const store = tx.objectStore('meanings');
-            for (const m of data.meanings) store.add(m);
-            await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+            for (const chunk of chunkArray(data.meanings, 5000)) {
+                const tx = this.db.transaction('meanings', 'readwrite');
+                const store = tx.objectStore('meanings');
+                for (const m of chunk) store.put(m);
+                await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+            }
         }
 
-        // Import sentences
+        // Import sentences (chunked — can be 100K+)
         if (data.sentences && data.sentences.length > 0) {
-            const tx = this.db.transaction('sentences', 'readwrite');
-            const store = tx.objectStore('sentences');
-            for (const s of data.sentences) store.add(s);
-            await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+            for (const chunk of chunkArray(data.sentences, 5000)) {
+                const tx = this.db.transaction('sentences', 'readwrite');
+                const store = tx.objectStore('sentences');
+                for (const s of chunk) store.put(s);
+                await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+            }
         }
 
         // Import categories
@@ -701,13 +712,24 @@ const DB = {
 
         // Import word_categories
         if (data.wordCategories && data.wordCategories.length > 0) {
-            const tx = this.db.transaction('word_categories', 'readwrite');
-            const store = tx.objectStore('word_categories');
-            for (const wc of data.wordCategories) store.add(wc);
-            await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+            for (const chunk of chunkArray(data.wordCategories, 5000)) {
+                const tx = this.db.transaction('word_categories', 'readwrite');
+                const store = tx.objectStore('word_categories');
+                for (const wc of chunk) store.put(wc);
+                await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+            }
         } else {
             // No word_categories in export — auto-categorize
             await this.autoCategorizeAllWords();
+        }
+
+        // Import history (session records)
+        if (data.history && data.history.length > 0) {
+            const tx = this.db.transaction('history', 'readwrite');
+            const store = tx.objectStore('history');
+            store.clear();
+            for (const h of data.history) store.put(h);
+            await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
         }
     }
 };
