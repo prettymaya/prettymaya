@@ -581,6 +581,17 @@ const DB = {
         });
     },
 
+    // Returns { word: [categoryId, ...] }
+    async getWordCategoriesGrouped() {
+        const all = await this.getAllWordCategories();
+        const map = {};
+        for (const wc of all) {
+            if (!map[wc.word]) map[wc.word] = [];
+            map[wc.word].push(wc.categoryId);
+        }
+        return map;
+    },
+
     // ─── Settings ────────────────────────────────────────────
     async getSetting(key) {
         return new Promise((resolve, reject) => {

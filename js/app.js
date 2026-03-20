@@ -580,6 +580,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Load all meanings in one batch (instead of N+1 per-word queries)
         allMeaningsGrouped = await DB.getAllMeaningsGrouped();
 
+        // Load category data for the word list
+        const allCategoriesArr = await DB.getAllCategories();
+        const catNameMap = {}; // id -> name
+        allCategoriesArr.forEach(c => catNameMap[c.id] = c.name);
+        const wordCatMap = await DB.getWordCategoriesGrouped(); // word -> [catId, ...]
+
         // Apply sorting based on currentTableSort
         let sorted = [...allWords];
         
@@ -616,12 +622,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!spacerTop) {
             spacerTop = document.createElement('tr');
             spacerTop.id = 'vs-spacer-top';
-            spacerTop.innerHTML = '<td colspan="4" style="padding:0;border:none;"></td>';
+            spacerTop.innerHTML = '<td colspan="5" style="padding:0;border:none;"></td>';
         }
         if (!spacerBottom) {
             spacerBottom = document.createElement('tr');
             spacerBottom.id = 'vs-spacer-bottom';
-            spacerBottom.innerHTML = '<td colspan="4" style="padding:0;border:none;"></td>';
+            spacerBottom.innerHTML = '<td colspan="5" style="padding:0;border:none;"></td>';
         }
 
         function renderVisibleRows() {
@@ -681,6 +687,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             ${count >= minSentencesRequired ? 'Hazır' : 'Eksik'}
                         </span>
                     </td>
+                    <td class="cat-cell">
+                        ${(wordCatMap[w.word] || []).map(cid => `<span class="cat-badge">${catNameMap[cid] || cid}</span>`).join('')}
+                        <button class="btn-cat-add" data-word="${w.word}" title="Kategoriye ekle/çıkar">+</button>
+                    </td>
                     <td style="display: flex; gap: 4px; justify-content: center; align-items: center;">
                         <button class="btn btn-ghost btn-sm btn-word-detail" data-word="${w.word}">
                             Detay
@@ -718,7 +728,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Global Event Delegation for Word List Buttons
-    els.wordListBody.addEventListener('click', (e) => {
+    els.wordListBody.addEventListener('click', async (e) => {
         const detailBtn = e.target.closest('.btn-word-detail');
         if (detailBtn) {
             openWordDetails(detailBtn.dataset.word);
@@ -728,6 +738,64 @@ document.addEventListener('DOMContentLoaded', async () => {
         const generateBtn = e.target.closest('.btn-word-generate-all');
         if (generateBtn) {
             generateSentencesForAllMeanings(generateBtn.dataset.word, 3);
+            return;
+        }
+
+        // Category add/remove popup
+        const catAddBtn = e.target.closest('.btn-cat-add');
+        if (catAddBtn) {
+            e.stopPropagation();
+            // Remove existing popup
+            document.querySelector('.cat-popup')?.remove();
+
+            const word = catAddBtn.dataset.word;
+            const categories = await DB.getAllCategories();
+            const wordCats = await DB.getCategoriesForWord(word);
+            const wordCatIds = new Set(wordCats.map(c => c.id));
+
+            const popup = document.createElement('div');
+            popup.className = 'cat-popup';
+            popup.style.position = 'absolute';
+            
+            let html = '';
+            for (const cat of categories) {
+                const checked = wordCatIds.has(cat.id) ? 'checked' : '';
+                html += `<label><input type="checkbox" class="cat-popup-check" data-cat-id="${cat.id}" data-word="${word}" ${checked}> ${cat.name}</label>`;
+            }
+            popup.innerHTML = html;
+
+            // Position relative to the button
+            const rect = catAddBtn.getBoundingClientRect();
+            popup.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+            popup.style.left = (rect.left + window.scrollX) + 'px';
+            document.body.appendChild(popup);
+
+            // Checkbox change handler
+            popup.addEventListener('change', async (ev) => {
+                const check = ev.target;
+                if (!check.classList.contains('cat-popup-check')) return;
+                const catId = Number(check.dataset.catId);
+                const w = check.dataset.word;
+                if (check.checked) {
+                    await DB.addWordToCategory(w, catId);
+                } else {
+                    await DB.removeWordFromCategory(w, catId);
+                }
+                // Refresh the row's category badges
+                await renderCategoryTabs();
+                await renderWordList(els.searchInput.value.trim());
+                popup.remove();
+            });
+
+            // Close popup when clicking outside
+            const closePopup = (ev) => {
+                if (!popup.contains(ev.target) && ev.target !== catAddBtn) {
+                    popup.remove();
+                    document.removeEventListener('click', closePopup);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closePopup), 0);
+            return;
         }
     });
 

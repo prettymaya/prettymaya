@@ -1026,6 +1026,75 @@ textarea {
     background: rgba(255, 255, 255, 0.05);
     border-color: rgba(255, 255, 255, 0.15);
 }
+
+/* ─── Category Badges in Word List ───────────── */
+.cat-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+.cat-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(139, 92, 246, 0.15);
+    color: var(--accent-purple-light);
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.btn-cat-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 0;
+    transition: all var(--transition-fast);
+}
+
+.btn-cat-add:hover {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: var(--accent-purple-light);
+    color: var(--accent-purple-light);
+}
+
+.cat-popup {
+    position: absolute;
+    background: var(--bg-glass);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 8px;
+    z-index: 100;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    min-width: 160px;
+}
+
+.cat-popup label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    transition: background var(--transition-fast);
+}
+
+.cat-popup label:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
 /* ─── Session Complete ────────────────────────── */
 .session-complete {
     text-align: center;
