@@ -203,6 +203,163 @@ document.addEventListener('DOMContentLoaded', async () => {
     let baseCardXP = 10;
     let currentDetailWord = null;
 
+    // ─── Font Size Control ──────────────────────────────────
+    let practiceScale = parseFloat(localStorage.getItem('practiceScale')) || 1;
+    const practiceContainer = document.getElementById('practice-active');
+    if (practiceContainer) {
+        practiceContainer.style.setProperty('--practice-scale', practiceScale);
+        practiceContainer.style.fontSize = `calc(1rem * ${practiceScale})`;
+    }
+
+    const btnFontUp = document.getElementById('btn-font-up');
+    const btnFontDown = document.getElementById('btn-font-down');
+    if (btnFontUp) {
+        btnFontUp.addEventListener('click', () => {
+            practiceScale = Math.min(1.5, practiceScale + 0.1);
+            practiceScale = Math.round(practiceScale * 10) / 10;
+            localStorage.setItem('practiceScale', practiceScale);
+            if (practiceContainer) {
+                practiceContainer.style.setProperty('--practice-scale', practiceScale);
+                practiceContainer.style.fontSize = `calc(1rem * ${practiceScale})`;
+            }
+        });
+    }
+    if (btnFontDown) {
+        btnFontDown.addEventListener('click', () => {
+            practiceScale = Math.max(0.7, practiceScale - 0.1);
+            practiceScale = Math.round(practiceScale * 10) / 10;
+            localStorage.setItem('practiceScale', practiceScale);
+            if (practiceContainer) {
+                practiceContainer.style.setProperty('--practice-scale', practiceScale);
+                practiceContainer.style.fontSize = `calc(1rem * ${practiceScale})`;
+            }
+        });
+    }
+
+    // ─── Session Resume System ───────────────────────────────
+    function saveSessionState() {
+        if (!currentSession) return;
+        try {
+            const state = {
+                practiceMode: practiceMode,
+                mainQueue: currentSession.mainQueue,
+                position: currentSession.position,
+                stats: currentSession.stats,
+                currentCard: currentSession.currentCard,
+                currentCardMode: currentCardMode,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('savedSession', JSON.stringify(state));
+        } catch (e) {
+            console.warn('Session save failed:', e);
+        }
+    }
+
+    function clearSavedSession() {
+        localStorage.removeItem('savedSession');
+    }
+
+    function getSavedSession() {
+        try {
+            const raw = localStorage.getItem('savedSession');
+            if (!raw) return null;
+            const state = JSON.parse(raw);
+            // Expire after 24 hours
+            if (Date.now() - state.timestamp > 24 * 60 * 60 * 1000) {
+                clearSavedSession();
+                return null;
+            }
+            return state;
+        } catch (e) {
+            clearSavedSession();
+            return null;
+        }
+    }
+
+    function resumeSession(state) {
+        practiceMode = state.practiceMode;
+        currentCardMode = state.currentCardMode || practiceMode;
+        
+        // Create a minimal session manager that can serve the remaining cards
+        currentSession = {
+            mainQueue: state.mainQueue || [],
+            position: state.position || 0,
+            stats: state.stats || { total: 0, correct: 0, incorrect: 0 },
+            currentCard: state.currentCard,
+            wordState: new Map(),
+            getNextCard() {
+                if (this.mainQueue.length > 0) {
+                    this.currentCard = this.mainQueue.shift();
+                    this.position++;
+                    this.stats.correct++;
+                    return this.currentCard;
+                }
+                return null;
+            },
+            getProgress() {
+                return {
+                    totalWords: this.stats.total,
+                    percentage: this.stats.total > 0 ? Math.round((this.position / this.stats.total) * 100) : 0,
+                    stats: this.stats
+                };
+            },
+            handleAnswer(isCorrect) { if (isCorrect) this.stats.correct++; else this.stats.incorrect++; },
+            replaceSentence(idx, newSentence) {
+                if (this.currentCard && this.currentCard.items && this.currentCard.items[idx]) {
+                    this.currentCard.items[idx].sentence = newSentence;
+                }
+            }
+        };
+
+        resetGamification();
+        els.practiceSetup.style.display = 'none';
+        els.practiceComplete.style.display = 'none';
+        els.practiceActive.style.display = 'block';
+
+        const prog = currentSession.getProgress();
+        els.progTotal.textContent = prog.totalWords;
+
+        loadNextCard();
+    }
+
+    // Check for saved session on load
+    const savedSession = getSavedSession();
+    if (savedSession && savedSession.mainQueue && savedSession.mainQueue.length > 0) {
+        // Show resume banner in practice setup
+        const resumeBanner = document.createElement('div');
+        resumeBanner.id = 'resume-banner';
+        resumeBanner.style.cssText = 'background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 12px; padding: 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;';
+        const remaining = savedSession.mainQueue.length;
+        const total = savedSession.stats.total;
+        const done = total - remaining;
+        resumeBanner.innerHTML = `
+            <div>
+                <strong style="color: var(--accent-purple-light);">⏸️ Yarım kalan oturum</strong>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">${done}/${total} tamamlandı — ${savedSession.practiceMode} modu</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn btn-primary btn-sm" id="btn-resume-session">▶ Devam Et</button>
+                <button class="btn btn-ghost btn-sm" id="btn-discard-session" style="color: var(--error);">✕ Sil</button>
+            </div>
+        `;
+        if (els.practiceSetup) {
+            els.practiceSetup.insertBefore(resumeBanner, els.practiceSetup.firstChild);
+            document.getElementById('btn-resume-session').addEventListener('click', () => {
+                resumeBanner.remove();
+                resumeSession(savedSession);
+            });
+            document.getElementById('btn-discard-session').addEventListener('click', () => {
+                clearSavedSession();
+                resumeBanner.remove();
+            });
+        }
+    }
+
+    // Save session on page unload
+    window.addEventListener('beforeunload', () => {
+        saveSessionState();
+    });
+
     // ─── Gamification Functions ─────────────────────────────
     function resetGamification() {
         gameScore = 0;
@@ -2300,8 +2457,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     els.btnQuitSession.addEventListener('click', () => {
-        if(confirm('Pratik oturumunu şu anki ilerlemenizle bitirmek istediğinize emin misiniz?')) {
-            finishSessionUI();
+        if(confirm('Oturumu kaydet ve sonra devam et?')) {
+            saveSessionState();
+            els.practiceActive.style.display = 'none';
+            els.practiceSetup.style.display = 'block';
+            currentSession = null;
         }
     });
 
@@ -2450,6 +2610,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         updateProgressUI();
+        saveSessionState();
 
         currentCardMode = practiceMode;
         if (practiceMode === 'mixed') {
@@ -2982,6 +3143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (els.btnInlineDeleteReading) els.btnInlineDeleteReading.addEventListener('click', handleInlineDelete);
 
     async function finishSessionUI() {
+        clearSavedSession();
         els.practiceActive.style.display = 'none';
         
         const prog = currentSession.getProgress();
@@ -3001,6 +3163,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     document.getElementById('btn-finish-session').addEventListener('click', () => {
+        clearSavedSession();
         els.practiceComplete.style.display = 'none';
         els.practiceSetup.style.display = 'block';
         document.querySelector('[data-target="view-dashboard"]').click();
