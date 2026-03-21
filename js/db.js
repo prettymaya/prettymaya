@@ -551,27 +551,34 @@ const DB = {
     },
 
     async addBulkWordsToCategory(words, categoryId) {
-        // Only adds words that exist in the DB, silently skips unknown ones
         const allWords = await this.getAllWords();
         const wordSet = new Set(allWords.map(w => w.word));
+
         const added = [];
         const skipped = [];
-
-        const tx = this.db.transaction('word_categories', 'readwrite');
-        const store = tx.objectStore('word_categories');
+        const alreadyIn = [];
 
         for (const word of words) {
             const clean = word.trim().toLowerCase();
             if (!clean) continue;
             if (!wordSet.has(clean)) { skipped.push(clean); continue; }
+
+            // Check if already in this category
+            const existingCats = await this.getCategoriesForWord(clean);
+            if (existingCats.includes(Number(categoryId))) {
+                alreadyIn.push(clean);
+                continue;
+            }
+
             try {
-                store.add({ word: clean, categoryId: Number(categoryId) });
+                await this.addWordToCategory(clean, Number(categoryId));
                 added.push(clean);
-            } catch (e) { /* duplicate, skip */ }
+            } catch (e) {
+                alreadyIn.push(clean);
+            }
         }
 
-        await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
-        return { added, skipped };
+        return { added, skipped, alreadyIn };
     },
 
     async getCategoryWordCounts() {

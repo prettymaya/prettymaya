@@ -964,7 +964,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const words = text.split('\n').map(w => w.trim()).filter(w => w.length > 0);
         const result = await DB.addBulkWordsToCategory(words, Number(catId));
         document.getElementById('input-bulk-words').value = '';
-        showToast(`${result.added.length} kelime eklendi. ${result.skipped.length} kelime atlandı (DB'de yok).`, 'success');
+        let msg = `${result.added.length} kelime eklendi.`;
+        if (result.alreadyIn && result.alreadyIn.length > 0) msg += ` ${result.alreadyIn.length} zaten kategorideydi.`;
+        if (result.skipped.length > 0) msg += ` ${result.skipped.length} kelime atlandı (DB'de yok).`;
+        showToast(msg, 'success');
         await renderCategoryManagement();
         await renderCategoryTabs();
     });
