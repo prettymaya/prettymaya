@@ -411,3 +411,37 @@ class SpeakingSessionManager {
         };
     }
 }
+
+class StorySessionManager {
+    constructor(stories) {
+        this.mainQueue = [...stories];
+        // Shuffle
+        for (let i = this.mainQueue.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.mainQueue[i], this.mainQueue[j]] = [this.mainQueue[j], this.mainQueue[i]];
+        }
+        this.position = 0;
+        this.stats = { total: this.mainQueue.length, correct: 0, incorrect: 0 };
+        this.currentCard = null;
+    }
+
+    getNextCard() {
+        if (this.mainQueue.length > 0) {
+            this.currentCard = this.mainQueue.shift();
+            this.position++;
+            this.stats.correct = this.position;
+            return this.currentCard;
+        }
+        this.currentCard = null;
+        return null;
+    }
+
+    getProgress() {
+        return {
+            totalWords: this.stats.total,
+            remaining: this.mainQueue.length,
+            percentage: this.stats.total > 0 ? Math.round((this.position / this.stats.total) * 100) : 0,
+            stats: this.stats
+        };
+    }
+}

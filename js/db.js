@@ -2,7 +2,7 @@
 const DB = {
     db: null,
     DB_NAME: 'prettymaya',
-    DB_VERSION: 5,
+    DB_VERSION: 6,
 
     DEFAULT_CATEGORIES: [
         { id: 1, name: 'v1 API', isDefault: true },
@@ -89,6 +89,12 @@ const DB = {
                     ensureIndex(wcStore, 'word', 'word', { unique: false });
                     ensureIndex(wcStore, 'categoryId', 'categoryId', { unique: false });
                     ensureIndex(wcStore, 'word_category', ['word', 'categoryId'], { unique: true });
+                }
+
+                // ─── v6: Stories store ─────────────────────────────────
+                if (!db.objectStoreNames.contains('stories')) {
+                    const storyStore = db.createObjectStore('stories', { keyPath: 'id', autoIncrement: true });
+                    storyStore.createIndex('createdDate', 'createdDate', { unique: false });
                 }
             };
         });
@@ -206,7 +212,7 @@ const DB = {
     },
 
     async deleteWord(word) {
-        const tx = this.db.transaction(['words', 'sentences', 'meanings', 'word_categories'], 'readwrite');
+        const tx = this.db.transaction(['words', 'sentences', 'meanings', 'word_categories', 'stories'], 'readwrite');
         tx.objectStore('words').delete(word);
 
         // Delete associated sentences
@@ -236,6 +242,20 @@ const DB = {
             if (cursor) { cursor.delete(); cursor.continue(); }
         };
 
+        // Delete stories containing this word
+        const storyStore = tx.objectStore('stories');
+        const stReq = storyStore.openCursor();
+        stReq.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (cursor) {
+                const story = cursor.value;
+                if (story.targetWords && story.targetWords.some(tw => tw.word === word)) {
+                    cursor.delete();
+                }
+                cursor.continue();
+            }
+        };
+
         return new Promise((resolve, reject) => {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
@@ -243,11 +263,12 @@ const DB = {
     },
 
     async deleteAllWords() {
-        const tx = this.db.transaction(['words', 'sentences', 'meanings', 'word_categories'], 'readwrite');
+        const tx = this.db.transaction(['words', 'sentences', 'meanings', 'word_categories', 'stories'], 'readwrite');
         tx.objectStore('words').clear();
         tx.objectStore('sentences').clear();
         tx.objectStore('meanings').clear();
         tx.objectStore('word_categories').clear();
+        tx.objectStore('stories').clear();
         return new Promise((resolve, reject) => {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
@@ -463,6 +484,77 @@ const DB = {
         });
     },
 
+    // ─── Stories ─────────────────────────────────────────────
+    async addStories(stories) {
+        const tx = this.db.transaction('stories', 'readwrite');
+        const store = tx.objectStore('stories');
+        const addedIds = [];
+
+        for (const story of stories) {
+            const id = await new Promise((resolve, reject) => {
+                const req = store.add({
+                    storyText: story.storyText,
+                    turkish: story.turkish,
+                    targetWords: story.targetWords, // [{word, meaningId, hint}]
+                    createdDate: new Date().toISOString()
+                });
+                req.onsuccess = (e) => resolve(e.target.result);
+                req.onerror = () => reject(req.error);
+            });
+            addedIds.push(id);
+        }
+
+        return addedIds;
+    },
+
+    async getAllStories() {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('stories', 'readonly');
+            const store = tx.objectStore('stories');
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async getStoryCount() {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('stories', 'readonly');
+            const store = tx.objectStore('stories');
+            const req = store.count();
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async getStoriesForMeaningIds(meaningIds) {
+        const allStories = await this.getAllStories();
+        const idSet = new Set(meaningIds.map(Number));
+        return allStories.filter(story =>
+            story.targetWords && story.targetWords.some(tw => idSet.has(Number(tw.meaningId)))
+        );
+    },
+
+    async deleteStory(id) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('stories', 'readwrite');
+            const store = tx.objectStore('stories');
+            const req = store.delete(Number(id));
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async deleteAllStories() {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('stories', 'readwrite');
+            const store = tx.objectStore('stories');
+            store.clear();
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    },
+
     // ─── Categories ───────────────────────────────────────────
     async getAllCategories() {
         return new Promise((resolve, reject) => {
@@ -675,8 +767,9 @@ const DB = {
         const history = await this.getSessionHistory();
         const categories = await this.getAllCategories();
         const wordCategories = await this.getAllWordCategories();
+        const stories = await this.getAllStories();
 
-        return { words, sentences, meanings, history, categories, wordCategories, exportDate: new Date().toISOString() };
+        return { words, sentences, meanings, history, categories, wordCategories, stories, exportDate: new Date().toISOString() };
     },
 
     async importAll(data) {
@@ -760,6 +853,21 @@ const DB = {
             store.clear();
             for (const h of data.history) store.put(h);
             await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+        }
+
+        // Import stories
+        if (data.stories && data.stories.length > 0) {
+            // Clear existing stories first
+            const clearTx = this.db.transaction('stories', 'readwrite');
+            clearTx.objectStore('stories').clear();
+            await new Promise((res, rej) => { clearTx.oncomplete = () => res(); clearTx.onerror = () => rej(clearTx.error); });
+
+            for (const chunk of chunkArray(data.stories, 5000)) {
+                const tx = this.db.transaction('stories', 'readwrite');
+                const store = tx.objectStore('stories');
+                for (const s of chunk) store.put(s);
+                await new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+            }
         }
     }
 };
