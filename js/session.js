@@ -465,11 +465,20 @@ class CombinedCardSessionManager {
             [expandedItems[i], expandedItems[j]] = [expandedItems[j], expandedItems[i]];
         }
 
-        // Group into chunks of `groupSize`
+        // Group into chunks of `groupSize`, merging remainder into last group
+        const groups = [];
         for (let i = 0; i < expandedItems.length; i += groupSize) {
-            const group = expandedItems.slice(i, i + groupSize);
+            groups.push(expandedItems.slice(i, i + groupSize));
+        }
+        // If last group is smaller than groupSize and there's a previous group, merge into it
+        if (groups.length > 1 && groups[groups.length - 1].length < groupSize) {
+            const remainder = groups.pop();
+            remainder.forEach(item => groups[groups.length - 1].push(item));
+        }
+
+        for (const group of groups) {
             if (group.length < 2) {
-                // Too small for a combined card, just add as warmup
+                // Single item — only warmup (edge case: total items = 1)
                 group.forEach(item => {
                     this.mainQueue.push({ type: 'warmup', ...item });
                 });

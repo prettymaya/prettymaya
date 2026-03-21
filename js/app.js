@@ -2500,6 +2500,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.phaseResult.classList.remove('visible');
             els.phaseWriting.classList.remove('visible');
             if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
+            if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
+            if (els.phaseCombined) els.phaseCombined.style.display = 'none';
             
             // Prepare reading card
             const parts = card.sentence.sentence.split('___');
@@ -2532,45 +2534,31 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.phaseWriting.classList.remove('visible');
             els.phaseReading.style.display = 'none';
             els.phaseWarmup.style.display = 'none';
+            if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
+            if (els.phaseCombined) els.phaseCombined.style.display = 'none';
             
             if (els.speakingWordsContainer) {
                 els.speakingWordsContainer.innerHTML = '';
                 
-                // Switch back to Grid for standard 3-card layout
+                // Compact 3-column equal layout
                 els.speakingWordsContainer.style.display = 'grid';
-                els.speakingWordsContainer.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
-                els.speakingWordsContainer.style.gap = '20px';
+                els.speakingWordsContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
+                els.speakingWordsContainer.style.gap = '12px';
+                els.speakingWordsContainer.style.alignItems = 'stretch';
                 
                 // card is an array of up to 3 cards for speaking mode
                 card.forEach((c, index) => {
+                    const meaningsHtml = c.meanings.map(m => `<div style="color: var(--warning); font-size: 0.8rem; margin-bottom: 2px;">• ${m}</div>`).join('');
                     const cardHtml = `
-                        <div style="background: var(--bg-glass); border-radius: 16px; padding: 24px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between;">
-                            <div>
-                                <h3 style="color: var(--warning); font-size: 2.2rem; font-weight: 800; margin-bottom: 16px; text-transform: lowercase;">${c.word}</h3>
-                                ${c.englishDefinition && c.englishDefinition !== "Anlam bulunamadı" ? `<div style="color: var(--text-primary); font-size: 0.95rem; margin-bottom: 12px; font-weight: 500; background: rgba(16, 185, 129, 0.1); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">EN: ${c.englishDefinition}</div>` : ''}
-                                <button class="btn btn-ghost btn-sm btn-show-hint-speaking" data-index="${index}" style="margin-top: 8px; margin-bottom: 12px; font-size: 0.85rem; color: var(--text-muted);"><i class="fa-solid fa-language"></i> Türkçe İpucu</button>
-                                <div class="speaking-hint-container" id="speaking-hint-${index}" style="display: none; background: rgba(249, 115, 22, 0.1); border: 1px dashed rgba(249, 115, 22, 0.3); border-radius: 8px; padding: 12px; text-align: left;">
-                                    ${c.meanings.map(m => `<div style="color: var(--warning); font-size: 0.9rem; margin-bottom: 2px;">• ${m}</div>`).join('')}
-                                </div>
+                        <div style="background: var(--bg-glass); border-radius: 12px; padding: 16px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+                            <h3 style="color: var(--warning); font-size: 1.3rem; font-weight: 800; text-transform: lowercase; word-break: break-word; margin: 0;">${c.word}</h3>
+                            ${c.englishDefinition && c.englishDefinition !== "Anlam bulunamadı" ? `<div style="color: var(--text-primary); font-size: 0.78rem; font-weight: 500; background: rgba(16, 185, 129, 0.1); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 8px; text-align: left;">EN: ${c.englishDefinition}</div>` : ''}
+                            <div style="background: rgba(249, 115, 22, 0.1); border: 1px dashed rgba(249, 115, 22, 0.3); border-radius: 6px; padding: 8px; text-align: left;">
+                                ${meaningsHtml}
                             </div>
                         </div>
                     `;
                     els.speakingWordsContainer.insertAdjacentHTML('beforeend', cardHtml);
-                });
-                
-                // Attach event listeners to hint buttons
-                document.querySelectorAll('.btn-show-hint-speaking').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const idx = e.currentTarget.getAttribute('data-index');
-                        const hintDiv = document.getElementById(`speaking-hint-${idx}`);
-                        if (hintDiv.style.display === 'none') {
-                            hintDiv.style.display = 'block';
-                            e.currentTarget.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Türkçeyi Gizle';
-                        } else {
-                            hintDiv.style.display = 'none';
-                            e.currentTarget.innerHTML = '<i class="fa-solid fa-language"></i> Türkçe İpucu';
-                        }
-                    });
                 });
             }
             
