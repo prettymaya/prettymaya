@@ -1960,6 +1960,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSession = new WarmUpSessionManager(readyMeaningsMap, 1);
         } else if (practiceMode === 'speaking') {
             currentSession = new SpeakingSessionManager([...readyMeaningsMap.keys()], readyMeaningsMap);
+        } else if (practiceMode === 'combined') {
+            currentSession = new CombinedCardSessionManager(readyMeaningsMap, combinedGroupSize, combinedSPM);
         } else {
             currentSession = new SessionManager(readyMeaningsMap, 1);
         }
@@ -2064,6 +2066,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSession = new WarmUpSessionManager(readyMeaningsMap, 1);
         } else if (practiceMode === 'speaking') {
             currentSession = new SpeakingSessionManager([...readyMeaningsMap.keys()], readyMeaningsMap);
+        } else if (practiceMode === 'combined') {
+            currentSession = new CombinedCardSessionManager(readyMeaningsMap, combinedGroupSize, combinedSPM);
         } else {
             currentSession = new SessionManager(readyMeaningsMap, 1);
         }
