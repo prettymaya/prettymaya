@@ -287,6 +287,17 @@ const DB = {
         });
     },
 
+    async getSentencesForMeaning(meaningId) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('sentences', 'readonly');
+            const store = tx.objectStore('sentences');
+            const index = store.index('meaningId');
+            const req = index.getAll(IDBKeyRange.only(Number(meaningId)));
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
     async getSentenceCountForWord(word) {
         return new Promise((resolve, reject) => {
             const tx = this.db.transaction('sentences', 'readonly');
@@ -488,23 +499,20 @@ const DB = {
     async addStories(stories) {
         const tx = this.db.transaction('stories', 'readwrite');
         const store = tx.objectStore('stories');
-        const addedIds = [];
 
         for (const story of stories) {
-            const id = await new Promise((resolve, reject) => {
-                const req = store.add({
-                    storyText: story.storyText,
-                    turkish: story.turkish,
-                    targetWords: story.targetWords, // [{word, meaningId, hint}]
-                    createdDate: new Date().toISOString()
-                });
-                req.onsuccess = (e) => resolve(e.target.result);
-                req.onerror = () => reject(req.error);
+            store.put({
+                storyText: story.storyText,
+                turkish: story.turkish,
+                targetWords: story.targetWords,
+                createdDate: new Date().toISOString()
             });
-            addedIds.push(id);
         }
 
-        return addedIds;
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve(stories.length);
+            tx.onerror = () => reject(tx.error);
+        });
     },
 
     async getAllStories() {

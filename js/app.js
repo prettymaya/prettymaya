@@ -125,24 +125,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         speakingWordsContainer: document.getElementById('speaking-words-container'),
         btnSpeakingNext: document.getElementById('btn-speaking-next'),
         
-        // Story Phase
-        btnModeStory: document.getElementById('mode-story'),
-        phaseStory: document.getElementById('phase-story'),
-        storyText: document.getElementById('story-text'),
-        storyTurkish: document.getElementById('story-turkish'),
-        storyWordsPanel: document.getElementById('story-words-panel'),
-        btnStoryNext: document.getElementById('btn-story-next'),
-        
-        // Stories View
-        statStoryCount: document.getElementById('stat-story-count'),
-        statStoryWords: document.getElementById('stat-story-words'),
-        inputStoryWords: document.getElementById('input-story-words'),
-        storyWordsPerStory: document.getElementById('story-words-per-story'),
-        storyCountPerMeaning: document.getElementById('story-count-per-meaning'),
-        btnStartStoryGeneration: document.getElementById('btn-start-story-generation'),
-        btnDeleteAllStories: document.getElementById('btn-delete-all-stories'),
-        storyGenStatus: document.getElementById('story-gen-status'),
-        storyListBody: document.getElementById('story-list-body'),
+        // Combined Card Phase
+        btnModeCombined: document.getElementById('mode-combined'),
+        combinedOptions: document.getElementById('combined-options'),
+        phaseCombinedWarmup: document.getElementById('phase-combined-warmup'),
+        combinedWarmupWord: document.getElementById('combined-warmup-word'),
+        combinedWarmupHint: document.getElementById('combined-warmup-hint'),
+        combinedWarmupEn: document.getElementById('combined-warmup-en'),
+        btnCombinedWarmupNext: document.getElementById('btn-combined-warmup-next'),
+        phaseCombined: document.getElementById('phase-combined'),
+        combinedSentencesContainer: document.getElementById('combined-sentences-container'),
+        btnCombinedNext: document.getElementById('btn-combined-next'),
         
         resIcon: document.getElementById('res-icon'),
         resWord: document.getElementById('res-word'),
@@ -301,7 +294,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     v.classList.add('active');
                     if(target === 'view-dashboard') updateDashboard();
                     if(target === 'view-words') renderWordList();
-                    if(target === 'view-stories') renderStoryView();
+
                 } else {
                     v.classList.remove('active');
                 }
@@ -2096,7 +2089,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnModeMixed.className = 'btn btn-secondary';
         els.btnModeWarmup.className = 'btn btn-secondary';
         if (els.btnModeSpeaking) els.btnModeSpeaking.className = 'btn btn-secondary';
-        if (els.btnModeStory) els.btnModeStory.className = 'btn btn-secondary';
+        if (els.btnModeCombined) els.btnModeCombined.className = 'btn btn-secondary';
+        if (els.combinedOptions) els.combinedOptions.style.display = 'none';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle pratik yapmak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
@@ -2108,7 +2102,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnModeMixed.className = 'btn btn-secondary';
         els.btnModeWarmup.className = 'btn btn-secondary';
         if (els.btnModeSpeaking) els.btnModeSpeaking.className = 'btn btn-secondary';
-        if (els.btnModeStory) els.btnModeStory.className = 'btn btn-secondary';
+        if (els.btnModeCombined) els.btnModeCombined.className = 'btn btn-secondary';
+        if (els.combinedOptions) els.combinedOptions.style.display = 'none';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelime okumak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
@@ -2120,7 +2115,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnModeReading.className = 'btn btn-secondary';
         els.btnModeWarmup.className = 'btn btn-secondary';
         if (els.btnModeSpeaking) els.btnModeSpeaking.className = 'btn btn-secondary';
-        if (els.btnModeStory) els.btnModeStory.className = 'btn btn-secondary';
+        if (els.btnModeCombined) els.btnModeCombined.className = 'btn btn-secondary';
+        if (els.combinedOptions) els.combinedOptions.style.display = 'none';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle karma pratik istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
@@ -2132,7 +2128,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnModeReading.className = 'btn btn-secondary';
         els.btnModeMixed.className = 'btn btn-secondary';
         if (els.btnModeSpeaking) els.btnModeSpeaking.className = 'btn btn-secondary';
-        if (els.btnModeStory) els.btnModeStory.className = 'btn btn-secondary';
+        if (els.btnModeCombined) els.btnModeCombined.className = 'btn btn-secondary';
+        if (els.combinedOptions) els.combinedOptions.style.display = 'none';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle ısınma yapmak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
@@ -2145,25 +2142,49 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.btnModeReading.className = 'btn btn-secondary';
             els.btnModeMixed.className = 'btn btn-secondary';
             els.btnModeWarmup.className = 'btn btn-secondary';
-            if (els.btnModeStory) els.btnModeStory.className = 'btn btn-secondary';
+            if (els.btnModeCombined) els.btnModeCombined.className = 'btn btn-secondary';
+        if (els.combinedOptions) els.combinedOptions.style.display = 'none';
             els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Sohbette kullanmak için kaç kelime istiyorsun?';
             els.countSelectors[0].parentElement.style.display = 'flex';
         });
     }
     
-    if (els.btnModeStory) {
-        els.btnModeStory.addEventListener('click', () => {
-            practiceMode = 'story';
-            els.btnModeStory.className = 'btn btn-primary';
+    // Combined card mode state
+    let combinedGroupSize = 3;
+    let combinedSPM = 1;
+
+    if (els.btnModeCombined) {
+        els.btnModeCombined.addEventListener('click', () => {
+            practiceMode = 'combined';
+            els.btnModeCombined.className = 'btn btn-primary';
             els.btnModeRecall.className = 'btn btn-secondary';
             els.btnModeReading.className = 'btn btn-secondary';
             els.btnModeMixed.className = 'btn btn-secondary';
             els.btnModeWarmup.className = 'btn btn-secondary';
             if (els.btnModeSpeaking) els.btnModeSpeaking.className = 'btn btn-secondary';
-            els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Hikaye modunda tüm hikayeler gösterilir.';
-            els.countSelectors[0].parentElement.style.display = 'none';
+            els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Birleşik kartta her grup ayrı gösterilir.';
+            els.countSelectors[0].parentElement.style.display = 'flex';
+            if (els.combinedOptions) els.combinedOptions.style.display = 'block';
         });
     }
+
+    // Group size buttons
+    document.querySelectorAll('.combined-group-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            combinedGroupSize = parseInt(btn.dataset.size);
+            document.querySelectorAll('.combined-group-btn').forEach(b => b.className = 'btn btn-secondary btn-sm combined-group-btn');
+            btn.className = 'btn btn-primary btn-sm combined-group-btn';
+        });
+    });
+
+    // Sentences per meaning buttons
+    document.querySelectorAll('.combined-spm-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            combinedSPM = parseInt(btn.dataset.spm);
+            document.querySelectorAll('.combined-spm-btn').forEach(b => b.className = 'btn btn-secondary btn-sm combined-spm-btn');
+            btn.className = 'btn btn-primary btn-sm combined-spm-btn';
+        });
+    });
     
     els.btnWarmupNext.addEventListener('click', () => {
         loadNextCard();
@@ -2185,8 +2206,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    if (els.btnStoryNext) {
-        els.btnStoryNext.addEventListener('click', () => {
+    if (els.btnCombinedWarmupNext) {
+        els.btnCombinedWarmupNext.addEventListener('click', () => {
+            loadNextCard();
+        });
+    }
+    if (els.btnCombinedNext) {
+        els.btnCombinedNext.addEventListener('click', () => {
             loadNextCard();
         });
     }
@@ -2358,22 +2384,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSession = new WarmUpSessionManager(filteredMap, 1);
         } else if (practiceMode === 'speaking') {
             currentSession = new SpeakingSessionManager([...filteredMap.keys()], filteredMap);
-        } else if (practiceMode === 'story') {
-            // Story mode: load stories from DB for the selected meanings
-            const meaningIds = [...filteredMap.values()].map(s => s.meaningId).filter(Boolean);
-            let stories;
-            if (meaningIds.length > 0) {
-                stories = await DB.getStoriesForMeaningIds(meaningIds);
-            } else {
-                stories = await DB.getAllStories();
-            }
-            if (stories.length === 0) {
-                showToast('Bu kelimeler için henüz hikaye üretilmemiş. Hikayeler sayfasından üretebilirsiniz.', 'error');
-                els.btnStartSession.disabled = false;
-                els.btnStartSession.innerHTML = 'Oturumu Başlat <i class="fa-solid fa-arrow-right"></i>';
-                return;
-            }
-            currentSession = new StorySessionManager(stories);
+        } else if (practiceMode === 'combined') {
+            currentSession = new CombinedCardSessionManager(filteredMap, combinedGroupSize, combinedSPM);
         } else {
             currentSession = new SessionManager(filteredMap, 1);
         }
@@ -2399,7 +2411,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const prog = currentSession.getProgress();
         let displayCurrent = 1;
         
-        if (practiceMode === 'reading' || practiceMode === 'warmup' || practiceMode === 'speaking' || practiceMode === 'story') {
+        if (practiceMode === 'reading' || practiceMode === 'warmup' || practiceMode === 'speaking' || practiceMode === 'combined') {
             displayCurrent = prog.stats.correct || 1;
         } else {
             const retries = currentSession.retryInserts ? currentSession.retryInserts.length : 0;
@@ -2454,7 +2466,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.phaseWriting.classList.remove('visible');
             els.phaseReading.style.display = 'none';
             if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
-            if (els.phaseStory) els.phaseStory.style.display = 'none';
+            if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
+            if (els.phaseCombined) els.phaseCombined.style.display = 'none';
             
             els.warmupWord.textContent = card.word;
             
@@ -2562,45 +2575,164 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        if (currentCardMode === 'story') {
+        if (card.type === 'warmup' && practiceMode === 'combined') {
+            // Combined warmup phase
             els.phaseQuestion.style.display = 'none';
             els.phaseResult.classList.remove('visible');
             els.phaseWriting.classList.remove('visible');
             els.phaseReading.style.display = 'none';
             els.phaseWarmup.style.display = 'none';
             if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
+            if (els.phaseCombined) els.phaseCombined.style.display = 'none';
             
-            // card is a story object: {storyText, turkish, targetWords}
-            // Highlight target words in story text
-            let storyHtml = card.storyText;
-            if (card.targetWords) {
-                card.targetWords.forEach(tw => {
-                    const form = tw.usedForm || tw.word;
-                    // Case-insensitive replace with highlighting span
-                    const regex = new RegExp(`\\b(${form.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\b`, 'gi');
-                    storyHtml = storyHtml.replace(regex, '<span class="story-highlight">$1</span>');
-                });
-            }
-            els.storyText.innerHTML = storyHtml;
-            els.storyTurkish.textContent = card.turkish || '';
-            
-            // Render target words panel
-            els.storyWordsPanel.innerHTML = '';
-            if (card.targetWords) {
-                card.targetWords.forEach(tw => {
-                    const chip = document.createElement('div');
-                    chip.className = 'story-word-chip';
-                    chip.innerHTML = `
-                        <div class="chip-word">${tw.word}</div>
-                        <div class="chip-hint">${tw.hint || ''}</div>
-                    `;
-                    els.storyWordsPanel.appendChild(chip);
-                });
-            }
+            els.combinedWarmupWord.textContent = card.word;
+            els.combinedWarmupHint.textContent = card.hint || '';
+            els.combinedWarmupEn.textContent = card.englishDefinition || '';
             
             els.retryIndicator.style.display = 'none';
-            if (els.phaseStory) els.phaseStory.style.display = 'block';
-            if (els.btnStoryNext) els.btnStoryNext.focus();
+            els.phaseCombinedWarmup.style.display = 'block';
+            els.btnCombinedWarmupNext.focus();
+            return;
+        }
+
+        if (card.type === 'combined' && practiceMode === 'combined') {
+            // Combined card phase — multiple sentences together
+            els.phaseQuestion.style.display = 'none';
+            els.phaseResult.classList.remove('visible');
+            els.phaseWriting.classList.remove('visible');
+            els.phaseReading.style.display = 'none';
+            els.phaseWarmup.style.display = 'none';
+            if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
+            if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
+            
+            els.combinedSentencesContainer.innerHTML = '';
+            
+            card.items.forEach((item, idx) => {
+                const row = document.createElement('div');
+                row.className = 'combined-sentence-row';
+                
+                // Build sentence with highlighted word
+                const sentenceText = item.sentence.sentence || '';
+                const parts = sentenceText.split('___');
+                const answer = item.sentence.answer || item.word;
+                const fullSentence = parts[0] + answer + (parts[1] || '');
+                
+                const sentenceHtml = parts[0] + 
+                    `<span class="combined-highlight" data-idx="${idx}">${answer}</span>` + 
+                    (parts[1] || '');
+                
+                row.innerHTML = `
+                    <div class="combined-sentence-text">${sentenceHtml}</div>
+                    <div class="combined-mini-hint" id="combined-hint-${idx}">${item.hint || ''}</div>
+                    <button class="combined-detail-btn" id="combined-detail-btn-${idx}">Detaylı Göster ▼</button>
+                    <div class="combined-detail-panel" id="combined-detail-${idx}">
+                        <div class="detail-row">
+                            <span class="detail-label">TR Cümle</span>
+                            <span class="detail-value">${item.sentence.turkish || ''}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">EN Tanım</span>
+                            <span class="detail-value">${item.englishDefinition || ''}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Kelime</span>
+                            <span class="detail-value">${item.word} → ${answer}</span>
+                        </div>
+                        <div class="detail-actions">
+                            <button class="btn-detail-action btn-change-sentence" data-idx="${idx}" data-meaning-id="${item.meaningId}" data-current-id="${item.sentence.id}">🔄 Cümle Değiştir</button>
+                            <button class="btn-detail-action danger btn-delete-sentence" data-idx="${idx}" data-sentence-id="${item.sentence.id}">🗑️ Cümle Sil</button>
+                        </div>
+                    </div>
+                `;
+                
+                els.combinedSentencesContainer.appendChild(row);
+            });
+            
+            // Attach click handlers for highlights
+            els.combinedSentencesContainer.querySelectorAll('.combined-highlight').forEach(hl => {
+                hl.addEventListener('click', () => {
+                    const idx = hl.dataset.idx;
+                    const hint = document.getElementById(`combined-hint-${idx}`);
+                    const detailBtn = document.getElementById(`combined-detail-btn-${idx}`);
+                    const detail = document.getElementById(`combined-detail-${idx}`);
+                    
+                    if (hl.classList.contains('active')) {
+                        // Close everything
+                        hl.classList.remove('active');
+                        hint.classList.remove('visible');
+                        detailBtn.style.display = 'none';
+                        detail.classList.remove('visible');
+                    } else {
+                        // Open compact hint
+                        hl.classList.add('active');
+                        hint.classList.add('visible');
+                        detailBtn.style.display = 'inline-block';
+                    }
+                });
+            });
+            
+            // Detail panel toggle
+            els.combinedSentencesContainer.querySelectorAll('.combined-detail-btn').forEach(btn => {
+                btn.style.display = 'none';
+                btn.addEventListener('click', () => {
+                    const idx = btn.id.replace('combined-detail-btn-', '');
+                    const panel = document.getElementById(`combined-detail-${idx}`);
+                    if (panel.classList.contains('visible')) {
+                        panel.classList.remove('visible');
+                        btn.textContent = 'Detaylı Göster ▼';
+                    } else {
+                        panel.classList.add('visible');
+                        btn.textContent = 'Detayı Gizle ▲';
+                    }
+                });
+            });
+            
+            // Change sentence handler
+            els.combinedSentencesContainer.querySelectorAll('.btn-change-sentence').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const idx = parseInt(btn.dataset.idx);
+                    const meaningId = btn.dataset.meaningId;
+                    const currentId = parseInt(btn.dataset.currentId);
+                    try {
+                        const allSentences = await DB.getSentencesForMeaning(meaningId);
+                        const other = allSentences.filter(s => s.id !== currentId);
+                        if (other.length === 0) {
+                            showToast('Bu anlam için başka cümle yok.', 'info');
+                            return;
+                        }
+                        const newSentence = other[Math.floor(Math.random() * other.length)];
+                        currentSession.replaceSentence(idx, newSentence);
+                        // Push current card back to re-render with updated sentence
+                        currentSession.mainQueue.unshift(currentSession.currentCard);
+                        currentSession.position--;
+                        loadNextCard();
+                    } catch (e) {
+                        showToast('Cümle değiştirme hatası.', 'error');
+                    }
+                });
+            });
+            
+            // Delete sentence handler
+            els.combinedSentencesContainer.querySelectorAll('.btn-delete-sentence').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const sentenceId = parseInt(btn.dataset.sentenceId);
+                    if (confirm('Bu cümleyi silmek istediğinize emin misiniz?')) {
+                        try {
+                            await DB.deleteSentenceById(sentenceId);
+                            showToast('Cümle silindi.', 'success');
+                            const idx = parseInt(btn.dataset.idx);
+                            // Remove this row from UI
+                            btn.closest('.combined-sentence-row').remove();
+                        } catch (e) {
+                            showToast('Silme hatası.', 'error');
+                        }
+                    }
+                });
+            });
+            
+            els.retryIndicator.style.display = 'none';
+            els.phaseCombined.style.display = 'block';
+            els.btnCombinedNext.focus();
             return;
         }
 
@@ -2608,7 +2740,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.phaseReading.style.display = 'none';
         els.phaseWarmup.style.display = 'none';
         if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
-        if (els.phaseStory) els.phaseStory.style.display = 'none';
+        if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
+        if (els.phaseCombined) els.phaseCombined.style.display = 'none';
 
         // Check if retry
         const state = currentSession.wordState.get(card.cardKey);
@@ -2882,165 +3015,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentSession = null;
     });
 
-    // ─── Story View ─────────────────────────────────────────
-    async function renderStoryView() {
-        try {
-            const stories = await DB.getAllStories();
-            
-            // Update stats
-            els.statStoryCount.textContent = stories.length;
-            const uniqueWords = new Set();
-            stories.forEach(s => {
-                if (s.targetWords) s.targetWords.forEach(tw => uniqueWords.add(tw.word));
-            });
-            els.statStoryWords.textContent = uniqueWords.size;
-            
-            // Render story list
-            els.storyListBody.innerHTML = '';
-            if (stories.length === 0) {
-                els.storyListBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 40px; color: var(--text-muted);"><i class="fa-solid fa-book-open" style="font-size: 2rem; margin-bottom: 8px; display: block;"></i>Henüz hikaye yok. Yukarıdan üretebilirsiniz.</td></tr>';
-                return;
-            }
-            
-            stories.forEach(story => {
-                const tr = document.createElement('tr');
-                const preview = (story.storyText || '').substring(0, 80) + ((story.storyText || '').length > 80 ? '...' : '');
-                const tags = (story.targetWords || []).map(tw => `<span class="story-tag">${tw.word}</span>`).join('');
-                tr.innerHTML = `
-                    <td><div class="story-preview">${preview}</div></td>
-                    <td><div class="story-tags">${tags}</div></td>
-                    <td><button class="btn btn-ghost btn-sm btn-delete-story" data-story-id="${story.id}" style="color: var(--error);"><i class="fa-solid fa-trash"></i></button></td>
-                `;
-                els.storyListBody.appendChild(tr);
-            });
-        } catch (e) {
-            console.error('renderStoryView error:', e);
-        }
-    }
 
-    // Story list deletion handler
-    els.storyListBody.addEventListener('click', async (e) => {
-        const deleteBtn = e.target.closest('.btn-delete-story');
-        if (deleteBtn) {
-            const storyId = Number(deleteBtn.dataset.storyId);
-            if (confirm('Bu hikayeyi silmek istediğinize emin misiniz?')) {
-                await DB.deleteStory(storyId);
-                showToast('Hikaye silindi.', 'success');
-                renderStoryView();
-            }
-        }
-    });
-
-    // Delete all stories
-    els.btnDeleteAllStories.addEventListener('click', async () => {
-        if (confirm('Tüm hikayeleri silmek istediğinize emin misiniz?')) {
-            await DB.deleteAllStories();
-            showToast('Tüm hikayeler silindi.', 'success');
-            renderStoryView();
-        }
-    });
-
-    // ─── Story Generation ───────────────────────────────────
-    els.btnStartStoryGeneration.addEventListener('click', async () => {
-        const inputText = els.inputStoryWords.value.trim();
-        if (!inputText) {
-            showToast('Lütfen kelime listesi girin.', 'error');
-            return;
-        }
-        
-        const wordsPerStory = parseInt(els.storyWordsPerStory.value) || 5;
-        const storiesPerMeaning = parseInt(els.storyCountPerMeaning.value) || 3;
-        
-        // Parse input: word:meaningId or just word
-        const lines = inputText.split('\n').map(l => l.trim()).filter(Boolean);
-        const parsedItems = [];
-        
-        for (const line of lines) {
-            const parts = line.split(':');
-            const word = parts[0].trim();
-            const meaningId = parts[1] ? parseInt(parts[1].trim()) : null;
-            
-            if (meaningId) {
-                // Get meaning from DB
-                const meanings = await DB.getMeanings(word);
-                const meaning = meanings.find(m => m.id === meaningId);
-                if (meaning) {
-                    parsedItems.push({
-                        word: word,
-                        meaningId: meaningId,
-                        definition: meaning.definition || '',
-                        hint: meaning.definition ? meaning.definition.replace(/\s*\[.*?\]\s*|\s*\(🤖.*?\)\s*/g, '').trim().substring(0, 60) : word
-                    });
-                }
-            } else {
-                // Get first meaning for word
-                const meanings = await DB.getMeanings(word);
-                if (meanings.length > 0) {
-                    for (const m of meanings) {
-                        parsedItems.push({
-                            word: word,
-                            meaningId: m.id,
-                            definition: m.definition || '',
-                            hint: m.definition ? m.definition.replace(/\s*\[.*?\]\s*|\s*\(🤖.*?\)\s*/g, '').trim().substring(0, 60) : word
-                        });
-                    }
-                }
-            }
-        }
-        
-        if (parsedItems.length < wordsPerStory) {
-            showToast(`En az ${wordsPerStory} kelime/anlam gerekli. Bulunan: ${parsedItems.length}`, 'error');
-            return;
-        }
-        
-        // Create groups: each meaning should appear in `storiesPerMeaning` different groups
-        const meaningGroups = [];
-        
-        // Simple approach: shuffle and chunk, repeat to cover storiesPerMeaning
-        for (let round = 0; round < storiesPerMeaning; round++) {
-            const shuffled = [...parsedItems];
-            for (let i = shuffled.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-            }
-            
-            for (let i = 0; i < shuffled.length; i += wordsPerStory) {
-                const group = shuffled.slice(i, i + wordsPerStory);
-                if (group.length >= wordsPerStory) {
-                    meaningGroups.push(group);
-                }
-            }
-        }
-        
-        if (meaningGroups.length === 0) {
-            showToast('Yeterli grup oluşturulamadı.', 'error');
-            return;
-        }
-        
-        els.btnStartStoryGeneration.disabled = true;
-        els.btnStartStoryGeneration.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;margin-right:6px"></span> Üretiliyor...';
-        els.storyGenStatus.textContent = `0 / ${meaningGroups.length} hikaye üretiliyor...`;
-        
-        try {
-            const stories = await GeminiService.generateStoriesForMeanings(meaningGroups, (current, total) => {
-                els.storyGenStatus.textContent = `${current} / ${total} hikaye üretiliyor...`;
-            });
-            
-            if (stories.length > 0) {
-                await DB.addStories(stories);
-                showToast(`${stories.length} hikaye başarıyla üretildi ve kaydedildi!`, 'success');
-                renderStoryView();
-            } else {
-                showToast('Hikaye üretilemedi. API anahtarınızı kontrol edin.', 'error');
-            }
-        } catch (e) {
-            showToast('Hikaye üretim hatası: ' + e.message, 'error');
-            console.error(e);
-        } finally {
-            els.btnStartStoryGeneration.disabled = false;
-            els.btnStartStoryGeneration.innerHTML = '<i class="fa-solid fa-bolt"></i> Hikaye Üretimini Başlat';
-            els.storyGenStatus.textContent = '';
-        }
-    });
-    
 });
+

@@ -34,10 +34,7 @@
                     <span class="icon"><i class="fa-solid fa-brain"></i></span>
                     <span class="text">Pratik Yap</span>
                 </a>
-                <a class="nav-link" data-target="view-stories">
-                    <span class="icon"><i class="fa-solid fa-book-open"></i></span>
-                    <span class="text">Hikayeler</span>
-                </a>
+
             </nav>
 
             <div class="sidebar-footer" style="margin-top: auto;">
@@ -278,7 +275,28 @@
                             <button class="btn btn-secondary" id="mode-mixed">Karışık</button>
                             <button class="btn btn-secondary" id="mode-warmup" style="background: rgba(16, 185, 129, 0.15); color: var(--success); border-color: rgba(16, 185, 129, 0.3);">Isınma (Warm Up)</button>
                             <button class="btn btn-secondary" id="mode-speaking" style="background: rgba(249, 115, 22, 0.15); color: var(--warning); border-color: rgba(249, 115, 22, 0.3);">Konuşma Oyunu (AI)</button>
-                            <button class="btn btn-secondary" id="mode-story" style="background: rgba(168, 85, 247, 0.15); color: #a855f7; border-color: rgba(168, 85, 247, 0.3);">📖 Hikaye Modu</button>
+                            <button class="btn btn-secondary" id="mode-combined" style="background: rgba(168, 85, 247, 0.15); color: #a855f7; border-color: rgba(168, 85, 247, 0.3);">🃏 Birleşik Kart</button>
+                        </div>
+
+                        <!-- Combined Card Options (hidden by default) -->
+                        <div id="combined-options" style="display: none; margin-bottom: 20px;">
+                            <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 12px;">
+                                <div style="text-align: center;">
+                                    <label style="font-size: 0.78rem; color: var(--text-secondary); display: block; margin-bottom: 6px;">Grup Boyutu</label>
+                                    <div style="display: flex; gap: 6px;">
+                                        <button class="btn btn-primary btn-sm combined-group-btn" data-size="3">3</button>
+                                        <button class="btn btn-secondary btn-sm combined-group-btn" data-size="5">5</button>
+                                    </div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <label style="font-size: 0.78rem; color: var(--text-secondary); display: block; margin-bottom: 6px;">Cümle / Anlam</label>
+                                    <div style="display: flex; gap: 6px;">
+                                        <button class="btn btn-primary btn-sm combined-spm-btn" data-spm="1">1</button>
+                                        <button class="btn btn-secondary btn-sm combined-spm-btn" data-spm="2">2</button>
+                                        <button class="btn btn-secondary btn-sm combined-spm-btn" data-spm="3">3</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Setup specific options -->
@@ -474,15 +492,23 @@
                             </button>
                         </div>
 
-                        <!-- Story Phase -->
-                        <div id="phase-story" style="display: none; padding: 10px;">
-                            <div class="story-card-container">
-                                <div class="story-text" id="story-text"></div>
-                                <div class="story-turkish" id="story-turkish"></div>
-                                <div class="story-words-panel" id="story-words-panel"></div>
-                            </div>
-                            <button class="btn btn-primary btn-lg" id="btn-story-next" style="width: 100%; max-width: 300px; margin: 20px auto 0; display: block;">
-                                Sonraki Hikaye <i class="fa-solid fa-chevron-right"></i>
+                        <!-- Combined Warmup Phase -->
+                        <div id="phase-combined-warmup" style="display: none; text-align: center; padding: 20px;">
+                            <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 12px;">Isınma</div>
+                            <div id="combined-warmup-word" style="font-size: 2.4rem; font-weight: 800; color: #a855f7; margin-bottom: 20px; text-transform: lowercase;"></div>
+                            <div id="combined-warmup-hint" style="background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.2); border-radius: 12px; padding: 14px 20px; margin-bottom: 12px; color: #c084fc; font-size: 1rem; font-weight: 500;"></div>
+                            <div id="combined-warmup-en" style="background: rgba(16,185,129,0.08); border: 1px dashed rgba(16,185,129,0.3); border-radius: 12px; padding: 12px 20px; color: var(--success); font-size: 0.9rem;"></div>
+                            <button class="btn btn-primary btn-lg" id="btn-combined-warmup-next" style="width: 100%; max-width: 300px; margin: 24px auto 0; display: block;">
+                                İleri <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </div>
+
+                        <!-- Combined Card Phase -->
+                        <div id="phase-combined" style="display: none; padding: 10px;">
+                            <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 16px; text-align: center;">Birleşik Kart</div>
+                            <div id="combined-sentences-container"></div>
+                            <button class="btn btn-primary btn-lg" id="btn-combined-next" style="width: 100%; max-width: 300px; margin: 24px auto 0; display: block;">
+                                Sonraki Grup <i class="fa-solid fa-chevron-right"></i>
                             </button>
                         </div>
 
@@ -512,87 +538,7 @@
                 </div>
             </section>
 
-            <!-- 3b. Stories View -->
-            <section id="view-stories" class="view">
-                <div class="view-header">
-                    <h2>Hikayeler</h2>
-                    <p>Kelimelerini hikayeler içinde gör ve öğren.</p>
-                </div>
 
-                <div class="card">
-                    <div class="card-header" style="flex-direction: column; align-items: stretch; gap: 16px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                            <h3 class="card-title"><i class="fa-solid fa-book-open" style="color: #a855f7; margin-right: 8px;"></i>Hikaye Yönetimi</h3>
-                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                <button class="btn btn-primary btn-sm" id="btn-generate-stories" style="background: linear-gradient(135deg, #a855f7, #6366f1); border: none;">
-                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Hikaye Üret
-                                </button>
-                                <button class="btn btn-secondary btn-sm" id="btn-delete-all-stories" style="color: var(--error); border-color: rgba(248,113,113,0.3);">
-                                    <i class="fa-solid fa-trash"></i> Tümünü Sil
-                                </button>
-                            </div>
-                        </div>
-                        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;">
-                            <div class="stat-card" style="padding: 12px;">
-                                <div class="stat-info" style="text-align: center;">
-                                    <h3 id="stat-story-count" style="font-size: 1.5rem;">0</h3>
-                                    <p style="font-size: 0.8rem;">Toplam Hikaye</p>
-                                </div>
-                            </div>
-                            <div class="stat-card" style="padding: 12px;">
-                                <div class="stat-info" style="text-align: center;">
-                                    <h3 id="stat-story-words" style="font-size: 1.5rem;">0</h3>
-                                    <p style="font-size: 0.8rem;">Kapsanan Kelime</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Story Generation Settings -->
-                    <div style="padding: 16px; border-top: 1px solid var(--border);">
-                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">Hikaye üretmek için kelime listeni yapıştır (her satıra <code>kelime:anlamId</code> veya sadece <code>kelime</code>):</p>
-                        <textarea id="input-story-words" placeholder="abandon:1234&#10;carve out:5678&#10;apple" style="min-height: 100px; font-family: monospace; font-size: 0.85rem; margin-bottom: 12px;"></textarea>
-                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
-                            <div style="flex: 1; min-width: 120px;">
-                                <label style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px; display: block;">Kelime / Hikaye:</label>
-                                <select id="story-words-per-story" style="width: 100%; padding: 8px; background: var(--bg-glass); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius-md); font-family: inherit;">
-                                    <option value="3">3</option>
-                                    <option value="5" selected>5</option>
-                                    <option value="7">7</option>
-                                </select>
-                            </div>
-                            <div style="flex: 1; min-width: 120px;">
-                                <label style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px; display: block;">Hikaye / Anlam:</label>
-                                <select id="story-count-per-meaning" style="width: 100%; padding: 8px; background: var(--bg-glass); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius-md); font-family: inherit;">
-                                    <option value="1">1</option>
-                                    <option value="2">2</option>
-                                    <option value="3" selected>3</option>
-                                </select>
-                            </div>
-                        </div>
-                        <button class="btn btn-primary" id="btn-start-story-generation" style="width: 100%; background: linear-gradient(135deg, #a855f7, #6366f1); border: none;">
-                            <i class="fa-solid fa-bolt"></i> Hikaye Üretimini Başlat
-                        </button>
-                        <div id="story-gen-status" style="margin-top: 12px; font-size: 0.85rem; color: var(--text-secondary); text-align: center;"></div>
-                    </div>
-
-                    <!-- Story List -->
-                    <div class="word-list-container" style="max-height: 500px;">
-                        <table class="word-list-table">
-                            <thead>
-                                <tr>
-                                    <th>Hikaye</th>
-                                    <th>Hedef Kelimeler</th>
-                                    <th style="width: 60px;">Sil</th>
-                                </tr>
-                            </thead>
-                            <tbody id="story-list-body">
-                                <!-- JS ile doldurulacak -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
 
             <!-- 4. Settings View -->
             <section id="view-settings" class="view">
@@ -721,10 +667,7 @@
                     <span class="icon"><i class="fa-solid fa-brain"></i></span>
                     <span class="text">Pratik</span>
                 </a>
-                <a class="mobile-nav-link" data-target="view-stories">
-                    <span class="icon"><i class="fa-solid fa-book-open"></i></span>
-                    <span class="text">Hikayeler</span>
-                </a>
+
                 <a class="mobile-nav-link" data-target="view-settings">
                     <span class="icon"><i class="fa-solid fa-gear"></i></span>
                     <span class="text">Ayarlar</span>

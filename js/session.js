@@ -411,18 +411,97 @@ class SpeakingSessionManager {
         };
     }
 }
-
-class StorySessionManager {
-    constructor(stories) {
-        this.mainQueue = [...stories];
-        // Shuffle
-        for (let i = this.mainQueue.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [this.mainQueue[i], this.mainQueue[j]] = [this.mainQueue[j], this.mainQueue[i]];
-        }
+class CombinedCardSessionManager {
+    constructor(meaningSentencesMap, groupSize = 3, sentencesPerMeaning = 1) {
+        this.groupSize = groupSize;
+        this.sentencesPerMeaning = sentencesPerMeaning;
+        this.mainQueue = []; // [{type:'warmup',...} or {type:'combined', sentences:[...]}]
         this.position = 0;
-        this.stats = { total: this.mainQueue.length, correct: 0, incorrect: 0 };
         this.currentCard = null;
+
+        // Convert map to array of {meaningId, sentences, word, englishDefinition, hint}
+        const allMeanings = [];
+        for (const [mId, sentences] of meaningSentencesMap) {
+            if (sentences.length === 0) continue;
+            allMeanings.push({
+                meaningId: mId,
+                word: sentences[0].word,
+                hint: sentences[0].hint || '',
+                englishDefinition: sentences[0].englishDefinition || '',
+                sentences: sentences
+            });
+        }
+
+        // Shuffle all meanings
+        for (let i = allMeanings.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allMeanings[i], allMeanings[j]] = [allMeanings[j], allMeanings[i]];
+        }
+
+        // For each meaning, pick `sentencesPerMeaning` random sentences
+        // Then create groups of `groupSize` (meaning, sentence) pairs
+        const expandedItems = []; // [{meaningId, word, hint, englishDefinition, sentence}]
+        for (const m of allMeanings) {
+            const shuffledSents = [...m.sentences];
+            for (let i = shuffledSents.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffledSents[i], shuffledSents[j]] = [shuffledSents[j], shuffledSents[i]];
+            }
+            const toTake = Math.min(sentencesPerMeaning, shuffledSents.length);
+            for (let i = 0; i < toTake; i++) {
+                expandedItems.push({
+                    meaningId: m.meaningId,
+                    word: m.word,
+                    hint: m.hint,
+                    englishDefinition: m.englishDefinition,
+                    sentence: shuffledSents[i]
+                });
+            }
+        }
+
+        // Shuffle expanded items
+        for (let i = expandedItems.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [expandedItems[i], expandedItems[j]] = [expandedItems[j], expandedItems[i]];
+        }
+
+        // Group into chunks of `groupSize`
+        for (let i = 0; i < expandedItems.length; i += groupSize) {
+            const group = expandedItems.slice(i, i + groupSize);
+            if (group.length < 2) {
+                // Too small for a combined card, just add as warmup
+                group.forEach(item => {
+                    this.mainQueue.push({ type: 'warmup', ...item });
+                });
+                continue;
+            }
+
+            // Add warmup cards first (one per item in group)
+            group.forEach(item => {
+                this.mainQueue.push({
+                    type: 'warmup',
+                    word: item.word,
+                    hint: item.hint,
+                    englishDefinition: item.englishDefinition,
+                    meaningId: item.meaningId,
+                    sentence: item.sentence
+                });
+            });
+
+            // Then add the combined card
+            this.mainQueue.push({
+                type: 'combined',
+                items: group.map(item => ({
+                    word: item.word,
+                    hint: item.hint,
+                    englishDefinition: item.englishDefinition,
+                    meaningId: item.meaningId,
+                    sentence: item.sentence
+                }))
+            });
+        }
+
+        this.stats = { total: this.mainQueue.length, correct: 0, incorrect: 0 };
     }
 
     getNextCard() {
@@ -443,5 +522,19 @@ class StorySessionManager {
             percentage: this.stats.total > 0 ? Math.round((this.position / this.stats.total) * 100) : 0,
             stats: this.stats
         };
+    }
+
+    // Replace a sentence in the current combined card
+    replaceSentence(itemIndex, newSentence) {
+        if (this.currentCard && this.currentCard.type === 'combined' && this.currentCard.items[itemIndex]) {
+            this.currentCard.items[itemIndex].sentence = newSentence;
+        }
+    }
+
+    // Remove a sentence from the current combined card
+    removeSentence(itemIndex) {
+        if (this.currentCard && this.currentCard.type === 'combined') {
+            this.currentCard.items.splice(itemIndex, 1);
+        }
     }
 }
