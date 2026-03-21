@@ -206,33 +206,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ─── Font Size Control ──────────────────────────────────
     let practiceScale = parseFloat(localStorage.getItem('practiceScale')) || 1;
     const practiceContainer = document.getElementById('practice-active');
-    if (practiceContainer) {
-        practiceContainer.style.setProperty('--practice-scale', practiceScale);
-        practiceContainer.style.fontSize = `calc(1rem * ${practiceScale})`;
+    function applyScale() {
+        if (practiceContainer) practiceContainer.style.zoom = practiceScale;
     }
+    applyScale();
 
     const btnFontUp = document.getElementById('btn-font-up');
     const btnFontDown = document.getElementById('btn-font-down');
+    const btnFontDefault = document.getElementById('btn-font-default');
     if (btnFontUp) {
         btnFontUp.addEventListener('click', () => {
-            practiceScale = Math.min(1.5, practiceScale + 0.1);
-            practiceScale = Math.round(practiceScale * 10) / 10;
+            practiceScale = Math.min(1.5, Math.round((practiceScale + 0.1) * 10) / 10);
             localStorage.setItem('practiceScale', practiceScale);
-            if (practiceContainer) {
-                practiceContainer.style.setProperty('--practice-scale', practiceScale);
-                practiceContainer.style.fontSize = `calc(1rem * ${practiceScale})`;
-            }
+            applyScale();
         });
     }
     if (btnFontDown) {
         btnFontDown.addEventListener('click', () => {
-            practiceScale = Math.max(0.7, practiceScale - 0.1);
-            practiceScale = Math.round(practiceScale * 10) / 10;
+            practiceScale = Math.max(0.7, Math.round((practiceScale - 0.1) * 10) / 10);
             localStorage.setItem('practiceScale', practiceScale);
-            if (practiceContainer) {
-                practiceContainer.style.setProperty('--practice-scale', practiceScale);
-                practiceContainer.style.fontSize = `calc(1rem * ${practiceScale})`;
-            }
+            applyScale();
+        });
+    }
+    if (btnFontDefault) {
+        btnFontDefault.addEventListener('click', () => {
+            practiceScale = 1;
+            localStorage.setItem('practiceScale', '1');
+            applyScale();
         });
     }
 
@@ -240,13 +240,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     function saveSessionState() {
         if (!currentSession) return;
         try {
+            // Speaking mode uses 'chunks' instead of 'mainQueue'
+            const queue = currentSession.chunks || currentSession.mainQueue || [];
             const state = {
                 practiceMode: practiceMode,
-                mainQueue: currentSession.mainQueue,
-                position: currentSession.position,
-                stats: currentSession.stats,
-                currentCard: currentSession.currentCard,
                 currentCardMode: currentCardMode,
+                mainQueue: queue,
+                position: currentSession.position || 0,
+                stats: currentSession.stats || { total: 0, correct: 0, incorrect: 0 },
+                currentCard: currentSession.currentCard || currentSession.currentCards || null,
                 timestamp: Date.now()
             };
             localStorage.setItem('savedSession', JSON.stringify(state));
@@ -264,7 +266,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const raw = localStorage.getItem('savedSession');
             if (!raw) return null;
             const state = JSON.parse(raw);
-            // Expire after 24 hours
             if (Date.now() - state.timestamp > 24 * 60 * 60 * 1000) {
                 clearSavedSession();
                 return null;
@@ -280,7 +281,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         practiceMode = state.practiceMode;
         currentCardMode = state.currentCardMode || practiceMode;
         
-        // Create a minimal session manager that can serve the remaining cards
+        const mode = state.practiceMode;
+        // Non-interactive modes auto-count correct on advance
+        const autoCount = ['reading', 'warmup', 'speaking', 'combined'].includes(mode);
+
         currentSession = {
             mainQueue: state.mainQueue || [],
             position: state.position || 0,
@@ -291,7 +295,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (this.mainQueue.length > 0) {
                     this.currentCard = this.mainQueue.shift();
                     this.position++;
-                    this.stats.correct++;
                     return this.currentCard;
                 }
                 return null;
@@ -303,7 +306,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     stats: this.stats
                 };
             },
-            handleAnswer(isCorrect) { if (isCorrect) this.stats.correct++; else this.stats.incorrect++; },
+            handleAnswer(isCorrect) { 
+                if (isCorrect) this.stats.correct++; 
+                else this.stats.incorrect++; 
+            },
             replaceSentence(idx, newSentence) {
                 if (this.currentCard && this.currentCard.items && this.currentCard.items[idx]) {
                     this.currentCard.items[idx].sentence = newSentence;
@@ -325,17 +331,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Check for saved session on load
     const savedSession = getSavedSession();
     if (savedSession && savedSession.mainQueue && savedSession.mainQueue.length > 0) {
-        // Show resume banner in practice setup
         const resumeBanner = document.createElement('div');
         resumeBanner.id = 'resume-banner';
         resumeBanner.style.cssText = 'background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 12px; padding: 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;';
         const remaining = savedSession.mainQueue.length;
         const total = savedSession.stats.total;
         const done = total - remaining;
+        const modeNames = { recall: 'Hatırlama', reading: 'Okuma', mixed: 'Karışık', warmup: 'Isınma', speaking: 'Konuşma', combined: 'Birleşik Kart' };
+        const modeName = modeNames[savedSession.practiceMode] || savedSession.practiceMode;
         resumeBanner.innerHTML = `
             <div>
                 <strong style="color: var(--accent-purple-light);">⏸️ Yarım kalan oturum</strong>
-                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">${done}/${total} tamamlandı — ${savedSession.practiceMode} modu</div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">${done}/${total} tamamlandı — ${modeName}</div>
             </div>
             <div style="display: flex; gap: 8px;">
                 <button class="btn btn-primary btn-sm" id="btn-resume-session">▶ Devam Et</button>
