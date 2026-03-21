@@ -322,6 +322,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.practiceComplete.style.display = 'none';
         els.practiceActive.style.display = 'block';
 
+        // Push the saved currentCard back into queue front
+        // so loadNextCard() will show the same card user was viewing
+        if (state.currentCard) {
+            currentSession.mainQueue.unshift(state.currentCard);
+            currentSession.position = Math.max(0, currentSession.position - 1);
+        }
+
         const prog = currentSession.getProgress();
         els.progTotal.textContent = prog.totalWords;
 
