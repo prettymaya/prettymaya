@@ -3181,5 +3181,208 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function handleCheck() {
         const inputStr = els.fcInput.value.trim();
-
         const isCorrect = currentSession.checkAnswer(inputStr);
+
+        const card = currentSession.currentCard;
+        const result = {
+            word: card.word,
+            answer: card.sentence.answer,
+            sentence: card.sentence.sentence,
+            turkish: card.sentence.turkish,
+            hint: card.sentence.hint || '',
+            isCorrect: isCorrect,
+            userInput: inputStr,
+            sentenceId: card.sentence.id,
+            meaningId: card.meaningId,
+            originalWord: card.sentence.word || card.word,
+            geminiAnswer: card.sentence.answer
+        };
+
+        if (!isReviewingHistory) {
+            currentSession.handleAnswer(isCorrect);
+            
+            if (isCorrect) {
+                const elapsed = Date.now() - cardStartTime;
+                const fast = elapsed < 8000;
+                const xp = fast ? baseCardXP * 2 : baseCardXP;
+                showXP(xp, fast);
+                updateStreak(true);
+            } else {
+                updateStreak(false);
+            }
+            
+            if (goBackHistory.length > 0) {
+                goBackHistory[goBackHistory.length - 1].result = result;
+            }
+        }
+
+        showResultPhase(result);
+    }
+
+    function showResultPhase(result) {
+        els.phaseQuestion.style.display = 'none';
+        els.phaseResult.classList.add('visible');
+        
+        const enableWriting = els.checkEnableSentenceCreation && els.checkEnableSentenceCreation.checked;
+        if (result.isCorrect && enableWriting) {
+            els.phaseWriting.classList.add('visible');
+            els.writingInput.value = '';
+            els.writingInput.focus();
+        } else {
+            els.phaseWriting.classList.remove('visible');
+        }
+
+        els.resIcon.textContent = result.isCorrect ? '✅' : '❌';
+        els.resWord.textContent = result.answer;
+        els.resWord.className = result.isCorrect ? 'result-word correct-word' : 'result-word incorrect-word';
+
+        const parts = result.sentence.split('___');
+        const fullHtml = parts[0] + `<strong style="color: var(--success); text-decoration: underline;">${result.answer}</strong>` + (parts[1] || '');
+        els.resEnglish.innerHTML = fullHtml;
+        els.resTurkish.textContent = result.turkish || '';
+        
+        els.resCompareOriginal.textContent = result.originalWord || result.word;
+        els.resCompareAnswer.textContent = result.geminiAnswer || result.answer;
+
+        els.btnInlineDeleteResult.style.display = 'inline-flex';
+        if (els.btnInlineDeleteReading) els.btnInlineDeleteReading.style.display = 'inline-flex';
+
+        updateProgressUI();
+        saveSessionState();
+    }
+
+    els.btnInlineDeleteResult.addEventListener('click', async () => {
+        const card = currentSession.currentCard;
+        if (!card || !card.sentence) return;
+        const sentenceId = card.sentence.id;
+        if (sentenceId && confirm('Bu cümleyi silmek istediğinize emin misiniz?')) {
+            try {
+                await DB.deleteSentenceById(sentenceId);
+                showToast('Cümle silindi.', 'success');
+                els.btnInlineDeleteResult.style.display = 'none';
+            } catch(e) {
+                showToast('Silme hatası.', 'error');
+            }
+        }
+    });
+
+    if (els.btnInlineDeleteReading) {
+        els.btnInlineDeleteReading.addEventListener('click', async () => {
+            const card = currentSession.currentCard;
+            if (!card || !card.sentence) return;
+            const sentenceId = card.sentence.id;
+            if (sentenceId && confirm('Bu cümleyi silmek istediğinize emin misiniz?')) {
+                try {
+                    await DB.deleteSentenceById(sentenceId);
+                    showToast('Cümle silindi.', 'success');
+                    els.btnInlineDeleteReading.style.display = 'none';
+                } catch(e) {
+                    showToast('Silme hatası.', 'error');
+                }
+            }
+        });
+    }
+
+    els.btnNext.addEventListener('click', () => {
+        els.phaseResult.classList.remove('visible');
+        els.phaseWriting.classList.remove('visible');
+        loadNextCard();
+    });
+
+    els.btnKnewIt.addEventListener('click', () => {
+        if (!currentSession) return;
+        const card = currentSession.currentCard;
+        if (!card) return;
+
+        if (!isReviewingHistory) {
+            currentSession.handleAnswer(true);
+            showXP(baseCardXP, false);
+            updateStreak(true);
+
+            if (goBackHistory.length > 0) {
+                goBackHistory[goBackHistory.length - 1].result = {
+                    word: card.word,
+                    answer: card.sentence.answer,
+                    sentence: card.sentence.sentence,
+                    turkish: card.sentence.turkish,
+                    isCorrect: true,
+                    userInput: '(bildim)',
+                    sentenceId: card.sentence.id,
+                    meaningId: card.meaningId,
+                    originalWord: card.sentence.word || card.word,
+                    geminiAnswer: card.sentence.answer
+                };
+            }
+        }
+
+        showResultPhase({
+            word: card.word,
+            answer: card.sentence.answer,
+            sentence: card.sentence.sentence,
+            turkish: card.sentence.turkish,
+            isCorrect: true,
+            userInput: '(bildim)',
+            sentenceId: card.sentence.id,
+            meaningId: card.meaningId,
+            originalWord: card.sentence.word || card.word,
+            geminiAnswer: card.sentence.answer
+        });
+    });
+
+    function finishSessionUI() {
+        clearSavedSession();
+        els.practiceActive.style.display = 'none';
+        els.practiceComplete.style.display = 'block';
+        
+        const prog = currentSession ? currentSession.getProgress() : { stats: { correct: 0, incorrect: 0 } };
+        const elCorrect = document.getElementById('complete-correct');
+        const elIncorrect = document.getElementById('complete-incorrect');
+        if (elCorrect) elCorrect.textContent = prog.stats.correct;
+        if (elIncorrect) elIncorrect.textContent = prog.stats.incorrect;
+    }
+
+    document.getElementById('btn-finish-session').addEventListener('click', async () => {
+        els.practiceComplete.style.display = 'none';
+        els.practiceSetup.style.display = 'block';
+        currentSession = null;
+        await updateDashboard();
+        document.querySelector('[data-target="view-practice"]').click();
+    });
+
+    els.btnQuitSession.addEventListener('click', () => {
+        if (confirm('Oturumu kaydetmek istiyor musun?')) {
+            saveSessionState();
+            showToast('Oturum kaydedildi. Daha sonra devam edebilirsin.', 'success');
+        } else {
+            clearSavedSession();
+        }
+        els.practiceActive.style.display = 'none';
+        els.practiceSetup.style.display = 'block';
+        currentSession = null;
+    });
+
+    els.fcInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            handleCheck();
+        }
+    });
+
+    els.btnHint.addEventListener('click', () => {
+        els.fcHint.style.display = 'block';
+        const card = currentSession ? currentSession.currentCard : null;
+        if (card) {
+            els.hintTr.textContent = card.sentence.hint || card.sentence.turkish || '';
+            const firstLetter = (card.sentence.answer || '')[0] || '';
+            els.hintLetter.textContent = `İlk Harf: ${firstLetter.toUpperCase()}`;
+        }
+    });
+
+    if (els.checkAutoHint) {
+        els.checkAutoHint.addEventListener('change', () => {
+            if (els.checkAutoHint.checked) {
+                els.fcHint.style.display = 'block';
+            }
+        });
+    }
+
+});
