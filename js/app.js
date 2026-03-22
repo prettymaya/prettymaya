@@ -3183,24 +3183,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const inputStr = els.fcInput.value.trim();
         const isCorrect = currentSession.checkAnswer(inputStr);
 
-        const card = currentSession.currentCard;
-        const result = {
-            word: card.word,
-            answer: card.sentence.answer,
-            sentence: card.sentence.sentence,
-            turkish: card.sentence.turkish,
-            hint: card.sentence.hint || '',
-            isCorrect: isCorrect,
-            userInput: inputStr,
-            sentenceId: card.sentence.id,
-            meaningId: card.meaningId,
-            originalWord: card.sentence.word || card.word,
-            geminiAnswer: card.sentence.answer
-        };
-
         if (!isReviewingHistory) {
-            currentSession.handleAnswer(isCorrect);
-            
+            const result = currentSession.handleAnswer(isCorrect);
+
             if (isCorrect) {
                 const elapsed = Date.now() - cardStartTime;
                 const fast = elapsed < 8000;
@@ -3210,47 +3195,60 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 updateStreak(false);
             }
-            
+
             if (goBackHistory.length > 0) {
                 goBackHistory[goBackHistory.length - 1].result = result;
             }
-        }
 
-        showResultPhase(result);
+            els.fcInput.disabled = true;
+            if (isCorrect) {
+                els.fcInput.classList.add('correct');
+                els.fcInput.value = result.correctAnswer;
+            } else {
+                els.fcInput.classList.add('incorrect');
+            }
+
+            setTimeout(() => {
+                showResultPhase(result);
+            }, 300);
+        } else {
+            // Reviewing history — just show the result
+            const card = currentSession.currentCard;
+            showResultPhase({
+                word: card.word,
+                isCorrect,
+                correctAnswer: card.sentence.answer,
+                fullSentence: card.sentence.sentence,
+                turkishTranslation: card.sentence.turkish,
+                isRetry: false,
+                isDone: false
+            });
+        }
     }
 
     function showResultPhase(result) {
         els.phaseQuestion.style.display = 'none';
         els.phaseResult.classList.add('visible');
-        
-        const enableWriting = els.checkEnableSentenceCreation && els.checkEnableSentenceCreation.checked;
-        if (result.isCorrect && enableWriting) {
-            els.phaseWriting.classList.add('visible');
-            els.writingInput.value = '';
-            els.writingInput.focus();
-        } else {
-            els.phaseWriting.classList.remove('visible');
-        }
 
         els.resIcon.textContent = result.isCorrect ? '✅' : '❌';
-        els.resWord.textContent = result.answer;
+        els.resWord.textContent = result.correctAnswer;
         els.resWord.className = result.isCorrect ? 'result-word correct-word' : 'result-word incorrect-word';
 
-        const parts = result.sentence.split('___');
-        const fullHtml = parts[0] + `<strong style="color: var(--success); text-decoration: underline;">${result.answer}</strong>` + (parts[1] || '');
+        const parts = result.fullSentence.split('___');
+        const fullHtml = parts[0] + `<strong style="color: var(--success); text-decoration: underline;">${result.correctAnswer}</strong>` + (parts[1] || '');
         els.resEnglish.innerHTML = fullHtml;
-        els.resTurkish.textContent = result.turkish || '';
-        
-        els.resCompareOriginal.textContent = result.originalWord || result.word;
-        els.resCompareAnswer.textContent = result.geminiAnswer || result.answer;
+        els.resTurkish.textContent = result.turkishTranslation || '';
+
+        if (els.resCompareOriginal) els.resCompareOriginal.textContent = result.word;
+        if (els.resCompareAnswer) els.resCompareAnswer.textContent = result.correctAnswer;
 
         els.btnInlineDeleteResult.style.display = 'inline-flex';
-        if (els.btnInlineDeleteReading) els.btnInlineDeleteReading.style.display = 'inline-flex';
 
         updateProgressUI();
         saveSessionState();
     }
 
+    // Delete sentence from result phase
     els.btnInlineDeleteResult.addEventListener('click', async () => {
         const card = currentSession.currentCard;
         if (!card || !card.sentence) return;
@@ -3283,57 +3281,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // Next button after result
     els.btnNext.addEventListener('click', () => {
         els.phaseResult.classList.remove('visible');
         els.phaseWriting.classList.remove('visible');
+        els.fcInput.disabled = false;
+        els.fcInput.classList.remove('correct', 'incorrect');
+        els.fcInput.value = '';
         loadNextCard();
     });
 
-    els.btnKnewIt.addEventListener('click', () => {
-        if (!currentSession) return;
-        const card = currentSession.currentCard;
-        if (!card) return;
-
-        if (!isReviewingHistory) {
-            currentSession.handleAnswer(true);
-            showXP(baseCardXP, false);
-            updateStreak(true);
-
-            if (goBackHistory.length > 0) {
-                goBackHistory[goBackHistory.length - 1].result = {
-                    word: card.word,
-                    answer: card.sentence.answer,
-                    sentence: card.sentence.sentence,
-                    turkish: card.sentence.turkish,
-                    isCorrect: true,
-                    userInput: '(bildim)',
-                    sentenceId: card.sentence.id,
-                    meaningId: card.meaningId,
-                    originalWord: card.sentence.word || card.word,
-                    geminiAnswer: card.sentence.answer
-                };
-            }
-        }
-
-        showResultPhase({
-            word: card.word,
-            answer: card.sentence.answer,
-            sentence: card.sentence.sentence,
-            turkish: card.sentence.turkish,
-            isCorrect: true,
-            userInput: '(bildim)',
-            sentenceId: card.sentence.id,
-            meaningId: card.meaningId,
-            originalWord: card.sentence.word || card.word,
-            geminiAnswer: card.sentence.answer
-        });
-    });
-
+    // Session Complete UI
     function finishSessionUI() {
         clearSavedSession();
         els.practiceActive.style.display = 'none';
         els.practiceComplete.style.display = 'block';
-        
+
         const prog = currentSession ? currentSession.getProgress() : { stats: { correct: 0, incorrect: 0 } };
         const elCorrect = document.getElementById('complete-correct');
         const elIncorrect = document.getElementById('complete-incorrect');
@@ -3348,41 +3311,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         await updateDashboard();
         document.querySelector('[data-target="view-practice"]').click();
     });
-
-    els.btnQuitSession.addEventListener('click', () => {
-        if (confirm('Oturumu kaydetmek istiyor musun?')) {
-            saveSessionState();
-            showToast('Oturum kaydedildi. Daha sonra devam edebilirsin.', 'success');
-        } else {
-            clearSavedSession();
-        }
-        els.practiceActive.style.display = 'none';
-        els.practiceSetup.style.display = 'block';
-        currentSession = null;
-    });
-
-    els.fcInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            handleCheck();
-        }
-    });
-
-    els.btnHint.addEventListener('click', () => {
-        els.fcHint.style.display = 'block';
-        const card = currentSession ? currentSession.currentCard : null;
-        if (card) {
-            els.hintTr.textContent = card.sentence.hint || card.sentence.turkish || '';
-            const firstLetter = (card.sentence.answer || '')[0] || '';
-            els.hintLetter.textContent = `İlk Harf: ${firstLetter.toUpperCase()}`;
-        }
-    });
-
-    if (els.checkAutoHint) {
-        els.checkAutoHint.addEventListener('change', () => {
-            if (els.checkAutoHint.checked) {
-                els.fcHint.style.display = 'block';
-            }
-        });
-    }
 
 });
