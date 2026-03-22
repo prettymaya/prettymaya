@@ -547,3 +547,100 @@ class CombinedCardSessionManager {
         }
     }
 }
+
+class ScanSessionManager {
+    constructor(meaningSentencesMap, pageSize = 20) {
+        this.pageSize = pageSize;
+        this.allItems = []; // [{word, meaningId, hint, englishDefinition, sentence}]
+        this.pages = [];
+        this.currentPageIndex = -1;
+        this.currentCard = null; // Current page (array of items)
+        this.position = 0;
+
+        // Build items from meaning-sentences map
+        for (const [mId, sentences] of meaningSentencesMap) {
+            if (sentences.length === 0) continue;
+            // Pick one random sentence for display
+            const sentence = sentences[Math.floor(Math.random() * sentences.length)];
+            this.allItems.push({
+                meaningId: mId,
+                word: sentence.word,
+                hint: sentence.hint || '',
+                englishDefinition: sentence.englishDefinition || '',
+                sentence: sentence,
+                allSentences: sentences
+            });
+        }
+
+        // Shuffle all items
+        for (let i = this.allItems.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.allItems[i], this.allItems[j]] = [this.allItems[j], this.allItems[i]];
+        }
+
+        // Split into pages
+        for (let i = 0; i < this.allItems.length; i += pageSize) {
+            this.pages.push(this.allItems.slice(i, i + pageSize));
+        }
+
+        this.stats = { total: this.pages.length, correct: 0, incorrect: 0 };
+        // mainQueue is kept for session resume compatibility
+        this.mainQueue = this.pages.slice();
+    }
+
+    getNextCard() {
+        this.currentPageIndex++;
+        if (this.currentPageIndex < this.pages.length) {
+            this.currentCard = {
+                type: 'scan-page',
+                pageIndex: this.currentPageIndex,
+                items: this.pages[this.currentPageIndex]
+            };
+            this.position = this.currentPageIndex + 1;
+            this.stats.correct = this.position;
+            // Update mainQueue for session resume
+            this.mainQueue = this.pages.slice(this.currentPageIndex);
+            return this.currentCard;
+        }
+        this.currentCard = null;
+        return null;
+    }
+
+    getPrevCard() {
+        if (this.currentPageIndex > 0) {
+            this.currentPageIndex -= 2; // go back 2 because getNextCard will +1
+            return this.getNextCard();
+        }
+        return null;
+    }
+
+    getProgress() {
+        return {
+            totalWords: this.stats.total,
+            remaining: this.stats.total - this.position,
+            percentage: this.stats.total > 0 ? Math.round((this.position / this.stats.total) * 100) : 0,
+            stats: this.stats
+        };
+    }
+
+    // Replace a sentence within the current page
+    replaceSentence(itemIndex, newSentence) {
+        if (this.currentCard && this.currentCard.items[itemIndex]) {
+            this.currentCard.items[itemIndex].sentence = newSentence;
+            // Also update in pages array
+            if (this.pages[this.currentPageIndex] && this.pages[this.currentPageIndex][itemIndex]) {
+                this.pages[this.currentPageIndex][itemIndex].sentence = newSentence;
+            }
+        }
+    }
+
+    // Remove a sentence item from the current page
+    removeSentence(itemIndex) {
+        if (this.currentCard && this.currentCard.items) {
+            this.currentCard.items.splice(itemIndex, 1);
+            if (this.pages[this.currentPageIndex]) {
+                this.pages[this.currentPageIndex].splice(itemIndex, 1);
+            }
+        }
+    }
+}

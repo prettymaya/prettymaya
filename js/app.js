@@ -137,6 +137,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         combinedSentencesContainer: document.getElementById('combined-sentences-container'),
         btnCombinedNext: document.getElementById('btn-combined-next'),
         
+        // Scan Mode Phase
+        btnModeScan: document.getElementById('mode-scan'),
+        scanOptions: document.getElementById('scan-options'),
+        phaseScan: document.getElementById('phase-scan'),
+        scanItemsContainer: document.getElementById('scan-items-container'),
+        scanPageIndicator: document.getElementById('scan-page-indicator'),
+        btnScanPrev: document.getElementById('btn-scan-prev'),
+        btnScanNext: document.getElementById('btn-scan-next'),
+        
         resIcon: document.getElementById('res-icon'),
         resWord: document.getElementById('res-word'),
         resEnglish: document.getElementById('res-english'),
@@ -283,7 +292,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         const mode = state.practiceMode;
         // Non-interactive modes auto-count correct on advance
-        const autoCount = ['reading', 'warmup', 'speaking', 'combined'].includes(mode);
+        const autoCount = ['reading', 'warmup', 'speaking', 'combined', 'scan'].includes(mode);
 
         currentSession = {
             mainQueue: state.mainQueue || [],
@@ -344,7 +353,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const remaining = savedSession.mainQueue.length;
         const total = savedSession.stats.total;
         const done = total - remaining;
-        const modeNames = { recall: 'Hatırlama', reading: 'Okuma', mixed: 'Karışık', warmup: 'Isınma', speaking: 'Konuşma', combined: 'Birleşik Kart' };
+        const modeNames = { recall: 'Hatırlama', reading: 'Okuma', mixed: 'Karışık', warmup: 'Isınma', speaking: 'Konuşma', combined: 'Birleşik Kart', scan: 'Hızlı Tarama' };
         const modeName = modeNames[savedSession.practiceMode] || savedSession.practiceMode;
         resumeBanner.innerHTML = `
             <div>
@@ -2259,52 +2268,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Mode toggles
     els.btnModeRecall.addEventListener('click', () => {
         practiceMode = 'recall';
+        resetAllModeButtons();
         els.btnModeRecall.className = 'btn btn-primary';
-        els.btnModeReading.className = 'btn btn-secondary';
-        els.btnModeMixed.className = 'btn btn-secondary';
-        els.btnModeWarmup.className = 'btn btn-secondary';
-        if (els.btnModeSpeaking) els.btnModeSpeaking.className = 'btn btn-secondary';
-        if (els.btnModeCombined) els.btnModeCombined.className = 'btn btn-secondary';
-        if (els.combinedOptions) els.combinedOptions.style.display = 'none';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle pratik yapmak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
     
     els.btnModeReading.addEventListener('click', () => {
         practiceMode = 'reading';
+        resetAllModeButtons();
         els.btnModeReading.className = 'btn btn-primary';
-        els.btnModeRecall.className = 'btn btn-secondary';
-        els.btnModeMixed.className = 'btn btn-secondary';
-        els.btnModeWarmup.className = 'btn btn-secondary';
-        if (els.btnModeSpeaking) els.btnModeSpeaking.className = 'btn btn-secondary';
-        if (els.btnModeCombined) els.btnModeCombined.className = 'btn btn-secondary';
-        if (els.combinedOptions) els.combinedOptions.style.display = 'none';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelime okumak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
 
     els.btnModeMixed.addEventListener('click', () => {
         practiceMode = 'mixed';
+        resetAllModeButtons();
         els.btnModeMixed.className = 'btn btn-primary';
-        els.btnModeRecall.className = 'btn btn-secondary';
-        els.btnModeReading.className = 'btn btn-secondary';
-        els.btnModeWarmup.className = 'btn btn-secondary';
-        if (els.btnModeSpeaking) els.btnModeSpeaking.className = 'btn btn-secondary';
-        if (els.btnModeCombined) els.btnModeCombined.className = 'btn btn-secondary';
-        if (els.combinedOptions) els.combinedOptions.style.display = 'none';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle karma pratik istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
 
     els.btnModeWarmup.addEventListener('click', () => {
         practiceMode = 'warmup';
+        resetAllModeButtons();
         els.btnModeWarmup.className = 'btn btn-primary';
-        els.btnModeRecall.className = 'btn btn-secondary';
-        els.btnModeReading.className = 'btn btn-secondary';
-        els.btnModeMixed.className = 'btn btn-secondary';
-        if (els.btnModeSpeaking) els.btnModeSpeaking.className = 'btn btn-secondary';
-        if (els.btnModeCombined) els.btnModeCombined.className = 'btn btn-secondary';
-        if (els.combinedOptions) els.combinedOptions.style.display = 'none';
         els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç kelimeyle ısınma yapmak istiyorsun?';
         els.countSelectors[0].parentElement.style.display = 'flex';
     });
@@ -2312,13 +2301,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (els.btnModeSpeaking) {
         els.btnModeSpeaking.addEventListener('click', () => {
             practiceMode = 'speaking';
+            resetAllModeButtons();
             els.btnModeSpeaking.className = 'btn btn-primary';
-            els.btnModeRecall.className = 'btn btn-secondary';
-            els.btnModeReading.className = 'btn btn-secondary';
-            els.btnModeMixed.className = 'btn btn-secondary';
-            els.btnModeWarmup.className = 'btn btn-secondary';
-            if (els.btnModeCombined) els.btnModeCombined.className = 'btn btn-secondary';
-        if (els.combinedOptions) els.combinedOptions.style.display = 'none';
             els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Sohbette kullanmak için kaç kelime istiyorsun?';
             els.countSelectors[0].parentElement.style.display = 'flex';
         });
@@ -2328,18 +2312,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     let combinedGroupSize = 3;
     let combinedSPM = 1;
 
+    // Scan mode state
+    let scanPageSize = 20;
+
+    function resetAllModeButtons() {
+        els.btnModeRecall.className = 'btn btn-secondary';
+        els.btnModeReading.className = 'btn btn-secondary';
+        els.btnModeMixed.className = 'btn btn-secondary';
+        els.btnModeWarmup.className = 'btn btn-secondary';
+        if (els.btnModeSpeaking) els.btnModeSpeaking.className = 'btn btn-secondary';
+        if (els.btnModeCombined) els.btnModeCombined.className = 'btn btn-secondary';
+        if (els.btnModeScan) els.btnModeScan.className = 'btn btn-secondary';
+        if (els.combinedOptions) els.combinedOptions.style.display = 'none';
+        if (els.scanOptions) els.scanOptions.style.display = 'none';
+    }
+
     if (els.btnModeCombined) {
         els.btnModeCombined.addEventListener('click', () => {
             practiceMode = 'combined';
+            resetAllModeButtons();
             els.btnModeCombined.className = 'btn btn-primary';
-            els.btnModeRecall.className = 'btn btn-secondary';
-            els.btnModeReading.className = 'btn btn-secondary';
-            els.btnModeMixed.className = 'btn btn-secondary';
-            els.btnModeWarmup.className = 'btn btn-secondary';
-            if (els.btnModeSpeaking) els.btnModeSpeaking.className = 'btn btn-secondary';
             els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Birleşik kartta her grup ayrı gösterilir.';
             els.countSelectors[0].parentElement.style.display = 'flex';
             if (els.combinedOptions) els.combinedOptions.style.display = 'block';
+        });
+    }
+
+    if (els.btnModeScan) {
+        els.btnModeScan.addEventListener('click', () => {
+            practiceMode = 'scan';
+            resetAllModeButtons();
+            els.btnModeScan.className = 'btn btn-primary';
+            els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Hızlı taramada kaç anlam işlemek istiyorsun?';
+            els.countSelectors[0].parentElement.style.display = 'flex';
+            if (els.scanOptions) els.scanOptions.style.display = 'block';
         });
     }
 
@@ -2358,6 +2364,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             combinedSPM = parseInt(btn.dataset.spm);
             document.querySelectorAll('.combined-spm-btn').forEach(b => b.className = 'btn btn-secondary btn-sm combined-spm-btn');
             btn.className = 'btn btn-primary btn-sm combined-spm-btn';
+        });
+    });
+
+    // Scan page size buttons
+    document.querySelectorAll('.scan-page-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            scanPageSize = parseInt(btn.dataset.pageSize);
+            document.querySelectorAll('.scan-page-btn').forEach(b => b.className = 'btn btn-secondary btn-sm scan-page-btn');
+            btn.className = 'btn btn-primary btn-sm scan-page-btn';
         });
     });
     
@@ -2564,6 +2579,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSession = new SpeakingSessionManager([...filteredMap.keys()], filteredMap);
         } else if (practiceMode === 'combined') {
             currentSession = new CombinedCardSessionManager(filteredMap, combinedGroupSize, combinedSPM);
+        } else if (practiceMode === 'scan') {
+            currentSession = new ScanSessionManager(filteredMap, scanPageSize);
         } else {
             currentSession = new SessionManager(filteredMap, 1);
         }
@@ -2589,7 +2606,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const prog = currentSession.getProgress();
         let displayCurrent = 1;
         
-        if (practiceMode === 'reading' || practiceMode === 'warmup' || practiceMode === 'speaking' || practiceMode === 'combined') {
+        if (practiceMode === 'reading' || practiceMode === 'warmup' || practiceMode === 'speaking' || practiceMode === 'combined' || practiceMode === 'scan') {
             displayCurrent = prog.stats.correct || 1;
         } else {
             const retries = currentSession.retryInserts ? currentSession.retryInserts.length : 0;
@@ -2647,6 +2664,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
             if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
             if (els.phaseCombined) els.phaseCombined.style.display = 'none';
+            if (els.phaseScan) els.phaseScan.style.display = 'none';
             
             els.warmupWord.textContent = card.word;
             
@@ -2677,6 +2695,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
             if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
             if (els.phaseCombined) els.phaseCombined.style.display = 'none';
+            if (els.phaseScan) els.phaseScan.style.display = 'none';
             
             // Prepare reading card
             const parts = card.sentence.sentence.split('___');
@@ -2711,6 +2730,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.phaseWarmup.style.display = 'none';
             if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
             if (els.phaseCombined) els.phaseCombined.style.display = 'none';
+            if (els.phaseScan) els.phaseScan.style.display = 'none';
             
             if (els.speakingWordsContainer) {
                 els.speakingWordsContainer.innerHTML = '';
@@ -2751,6 +2771,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.phaseWarmup.style.display = 'none';
             if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
             if (els.phaseCombined) els.phaseCombined.style.display = 'none';
+            if (els.phaseScan) els.phaseScan.style.display = 'none';
             
             els.combinedWarmupWord.textContent = card.word;
             els.combinedWarmupHint.textContent = card.hint || '';
@@ -2771,6 +2792,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.phaseWarmup.style.display = 'none';
             if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
             if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
+            if (els.phaseScan) els.phaseScan.style.display = 'none';
             
             els.combinedSentencesContainer.innerHTML = '';
             
@@ -2903,12 +2925,28 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        // ─── Scan Mode ────────────────────────────────────────
+        if (card.type === 'scan-page' && practiceMode === 'scan') {
+            els.phaseQuestion.style.display = 'none';
+            els.phaseResult.classList.remove('visible');
+            els.phaseWriting.classList.remove('visible');
+            els.phaseReading.style.display = 'none';
+            els.phaseWarmup.style.display = 'none';
+            if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
+            if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
+            if (els.phaseCombined) els.phaseCombined.style.display = 'none';
+            
+            renderScanPage(card);
+            return;
+        }
+
         // Active Recall Mode
         els.phaseReading.style.display = 'none';
         els.phaseWarmup.style.display = 'none';
         if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
         if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
         if (els.phaseCombined) els.phaseCombined.style.display = 'none';
+        if (els.phaseScan) els.phaseScan.style.display = 'none';
 
         // Check if retry
         const state = currentSession.wordState.get(card.cardKey);
@@ -3015,175 +3053,133 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    // ─── Scan Mode: Render and Navigation ─────────────────────
+    function renderScanPage(card) {
+        const container = els.scanItemsContainer;
+        container.innerHTML = '';
+        
+        const totalPages = currentSession.pages ? currentSession.pages.length : 1;
+        const currentPage = card.pageIndex + 1;
+        const pageOffset = card.pageIndex * (currentSession.pageSize || 20);
+        
+        els.scanPageIndicator.textContent = `Sayfa ${currentPage} / ${totalPages}`;
+        
+        // Update prev/next button states
+        if (els.btnScanPrev) els.btnScanPrev.disabled = (card.pageIndex <= 0);
+        if (els.btnScanNext) {
+            els.btnScanNext.textContent = (currentPage >= totalPages) ? 'Bitir ✔' : 'Sonraki ▶';
+            els.btnScanNext.innerHTML = (currentPage >= totalPages) 
+                ? 'Bitir <i class="fa-solid fa-check"></i>' 
+                : 'Sonraki <i class="fa-solid fa-chevron-right"></i>';
+        }
+        
+        card.items.forEach((item, idx) => {
+            const sentenceText = item.sentence.sentence || '';
+            const parts = sentenceText.split('___');
+            const answer = item.sentence.answer || item.word;
+            const sentenceHtml = parts[0] + `<span class="scan-highlight">${answer}</span>` + (parts[1] || '');
+            const globalNum = pageOffset + idx + 1;
+            
+            const div = document.createElement('div');
+            div.className = 'scan-item';
+            div.dataset.idx = idx;
+            
+            let englishHtml = '';
+            if (item.englishDefinition && item.englishDefinition !== 'Anlam bulunamadı') {
+                englishHtml = `<div class="scan-item-english">🇬🇧 ${item.englishDefinition}</div>`;
+            }
+            
+            div.innerHTML = `
+                <div class="scan-item-header">
+                    <div class="scan-item-number">${globalNum}</div>
+                    <div class="scan-item-word">${item.word}</div>
+                </div>
+                ${englishHtml}
+                <div class="scan-item-turkish">🇹🇷 ${item.hint}</div>
+                <div class="scan-item-sentence">${sentenceHtml}</div>
+                <div class="scan-item-sentence-turkish">${item.sentence.turkish || ''}</div>
+                <div class="scan-item-actions">
+                    <button class="btn btn-ghost btn-sm scan-change-btn" data-idx="${idx}" data-meaning-id="${item.meaningId}" data-current-id="${item.sentence.id}" title="Başka cümle getir">
+                        <i class="fa-solid fa-shuffle"></i> Değiştir
+                    </button>
+                    <button class="btn btn-ghost btn-sm scan-delete-btn" data-idx="${idx}" data-sentence-id="${item.sentence.id}" style="color: var(--error);" title="Bu cümleyi sil">
+                        <i class="fa-solid fa-trash"></i> Sil
+                    </button>
+                </div>
+            `;
+            
+            container.appendChild(div);
+        });
+        
+        // Attach sentence change handlers
+        container.querySelectorAll('.scan-change-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const idx = parseInt(btn.dataset.idx);
+                const meaningId = btn.dataset.meaningId;
+                const currentId = parseInt(btn.dataset.currentId);
+                try {
+                    const allSentences = await DB.getSentencesForMeaning(meaningId);
+                    const other = allSentences.filter(s => s.id !== currentId);
+                    if (other.length === 0) {
+                        showToast('Bu anlam için başka cümle yok.', 'info');
+                        return;
+                    }
+                    const newSentence = other[Math.floor(Math.random() * other.length)];
+                    currentSession.replaceSentence(idx, newSentence);
+                    renderScanPage(currentSession.currentCard);
+                    showToast('Cümle değiştirildi 🔄', 'success');
+                } catch (e) {
+                    showToast('Cümle değiştirme hatası.', 'error');
+                }
+            });
+        });
+        
+        // Attach sentence delete handlers
+        container.querySelectorAll('.scan-delete-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const sentenceId = parseInt(btn.dataset.sentenceId);
+                if (confirm('Bu cümleyi silmek istediğinize emin misiniz?')) {
+                    try {
+                        await DB.deleteSentenceById(sentenceId);
+                        showToast('Cümle silindi.', 'success');
+                        btn.closest('.scan-item').remove();
+                    } catch (e) {
+                        showToast('Silme hatası.', 'error');
+                    }
+                }
+            });
+        });
+        
+        els.retryIndicator.style.display = 'none';
+        els.phaseScan.style.display = 'block';
+        
+        // Scroll to top of scan container
+        els.phaseScan.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    
+    // Scan Navigation Handlers
+    if (els.btnScanNext) {
+        els.btnScanNext.addEventListener('click', () => {
+            loadNextCard();
+        });
+    }
+    
+    if (els.btnScanPrev) {
+        els.btnScanPrev.addEventListener('click', () => {
+            if (currentSession && currentSession.getPrevCard) {
+                const prevCard = currentSession.getPrevCard();
+                if (prevCard) {
+                    updateProgressUI();
+                    saveSessionState();
+                    renderScanPage(prevCard);
+                } else {
+                    showToast('İlk sayfadasınız.', 'info');
+                }
+            }
+        });
+    }
+
     function handleCheck() {
         const inputStr = els.fcInput.value.trim();
 
         const isCorrect = currentSession.checkAnswer(inputStr);
-        const result = currentSession.handleAnswer(isCorrect);
-        
-        const isQuick = (Date.now() - cardStartTime) < 4000;
-        let xpGained = baseCardXP;
-        if (isCorrect) {
-            if (isQuick) xpGained = Math.floor(baseCardXP * 1.5);
-            showXP(xpGained, isQuick);
-        }
-        updateStreak(isCorrect);
-        
-        if (goBackHistory.length > 0) goBackHistory[goBackHistory.length - 1].result = result;
-        
-        updateProgressUI();
-
-        // Visual Feedback on Input
-        els.fcInput.disabled = true;
-        if (isCorrect) {
-            els.fcInput.classList.add('correct');
-            els.fcInput.value = result.correctAnswer;
-        } else {
-            els.fcInput.classList.add('incorrect');
-            els.fcInput.classList.add('shake');
-            setTimeout(() => els.fcInput.classList.remove('shake'), 400);
-        }
-
-        // Wait a tiny bit then show result phase
-        setTimeout(() => {
-            showResultPhase(result);
-        }, 500);
-    }
-
-    function showResultPhase(result, isHistoryReview = false) {
-        els.phaseQuestion.style.display = 'none';
-        
-        els.resIcon.textContent = result.isCorrect ? '✅' : '❌';
-        els.resWord.textContent = result.correctAnswer;
-        els.resWord.className = `result-word ${result.isCorrect ? 'correct-word' : 'incorrect-word'}`;
-        
-        // Render english sentence with highlight
-        const parts = result.fullSentence.split('___');
-        const highlightedSent = parts[0] + `<strong style="color:var(--accent-purple-light)">${result.correctAnswer}</strong>` + (parts[1] || '');
-        els.resEnglish.innerHTML = highlightedSent;
-
-        els.resTurkish.textContent = result.turkishTranslation;
-        
-        // Populate Comparison
-        els.resCompareOriginal.textContent = result.word;
-        els.resCompareAnswer.textContent = result.correctAnswer;
-
-        els.phaseResult.classList.add('visible');
-
-        if (isHistoryReview) {
-            els.phaseWriting.classList.remove('visible');
-            els.btnNext.innerHTML = 'Kaldığım Yerden Devam Et <i class="fa-solid fa-chevron-right"></i>';
-            els.btnNext.focus();
-        } else {
-            els.btnNext.innerHTML = 'Sıradaki <i class="fa-solid fa-chevron-right"></i>';
-            if (result.isCorrect && els.checkEnableSentenceCreation.checked) {
-                els.phaseWriting.classList.add('visible');
-                els.writingInput.value = '';
-                els.writingInput.focus();
-                
-                // Allow skipping writing by pressing Enter
-                els.writingInput.onkeypress = (e) => {
-                    if (e.key === 'Enter') els.btnNext.click();
-                };
-            } else {
-                els.phaseWriting.classList.remove('visible');
-                els.btnNext.focus();
-            }
-        }
-    }
-
-    els.btnNext.addEventListener('click', () => {
-        loadNextCard();
-    });
-
-    async function handleInlineDelete() {
-        if (!currentSession || !currentSession.currentCard || !currentSession.currentCard.sentence) return;
-        
-        const cardWord = currentSession.currentCard.word;
-        const sentenceId = currentSession.currentCard.sentence.id;
-        
-        if (confirm('Bu cümleyi tamamen silmek istediğinize emin misiniz?')) {
-            try {
-                // 1. Delete from DB
-                await DB.deleteSentenceById(sentenceId);
-                
-                // 2. Remove from session memory
-                if (currentSession.wordSentences && currentSession.wordSentences.has(cardWord)) {
-                    let sents = currentSession.wordSentences.get(cardWord);
-                    sents = sents.filter(s => s.id !== sentenceId);
-                    currentSession.wordSentences.set(cardWord, sents);
-                    
-                    // If the word has no more sentences left, don't ask it again.
-                    if (sents.length > 0) {
-                        // Assign a new sentence to this card BEFORE unshifting!
-                        const state = currentSession.wordState.get(currentSession.currentCard.cardKey);
-                        const unused = sents.filter(s => !state.usedSentenceIds.has(s.id));
-                        
-                        let newSent = unused.length > 0 
-                                      ? unused[Math.floor(Math.random() * unused.length)] 
-                                      : sents[Math.floor(Math.random() * sents.length)];
-                                      
-                        currentSession.currentCard.sentence = newSent;
-                        state.usedSentenceIds.add(newSent.id);
-
-                        currentSession.mainQueue.unshift(currentSession.currentCard);
-                    } else {
-                        // Card is totally consumed, decrement total session words to avoid hanging progress bar
-                        currentSession.stats.total = Math.max(1, currentSession.stats.total - 1);
-                    }
-                } else if (!currentSession.wordSentences) {
-                    // This is a ReadingSessionManager or WarmUpSessionManager
-                    // Decrease total session stats since we deleted it entirely
-                    currentSession.stats.total = Math.max(1, currentSession.stats.total - 1);
-                }
-
-                // 3. Re-adjust position since we didn't "answer" it properly
-                if (currentSession.position > 0) currentSession.position--;
-
-                // 4. Update the global dashboard UI so the "Sentence Count" decreases
-                await updateDashboard();
-
-                showToast('Hatalı cümle kalıcı olarak silindi. 🗑️', 'success');
-                
-                // 5. Load the next card
-                loadNextCard(); 
-            } catch (e) {
-                showToast('Cümle silinirken hata oluştu.', 'error');
-            }
-        }
-    }
-
-    if (els.btnInlineDeleteResult) els.btnInlineDeleteResult.addEventListener('click', handleInlineDelete);
-    if (els.btnInlineDeleteReading) els.btnInlineDeleteReading.addEventListener('click', handleInlineDelete);
-
-    async function finishSessionUI() {
-        clearSavedSession();
-        els.practiceActive.style.display = 'none';
-        
-        const prog = currentSession.getProgress();
-        document.getElementById('complete-correct').textContent = prog.stats.correct;
-        document.getElementById('complete-incorrect').textContent = prog.stats.incorrect;
-        
-        els.practiceComplete.style.display = 'block';
-        
-        // Save to History
-        await DB.addSessionHistory({
-            totalWords: prog.totalWords,
-            correct: prog.stats.correct,
-            incorrect: prog.stats.incorrect
-        });
-
-        await updateDashboard();
-    }
-
-    document.getElementById('btn-finish-session').addEventListener('click', () => {
-        clearSavedSession();
-        els.practiceComplete.style.display = 'none';
-        els.practiceSetup.style.display = 'block';
-        document.querySelector('[data-target="view-dashboard"]').click();
-        currentSession = null;
-    });
-
-
-});
-
