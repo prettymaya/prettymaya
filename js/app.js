@@ -2142,6 +2142,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSession = new SpeakingSessionManager([...readyMeaningsMap.keys()], readyMeaningsMap);
         } else if (practiceMode === 'combined') {
             currentSession = new CombinedCardSessionManager(readyMeaningsMap, combinedGroupSize, combinedSPM);
+        } else if (practiceMode === 'scan') {
+            currentSession = new ScanSessionManager(readyMeaningsMap, scanPageSize);
         } else {
             currentSession = new SessionManager(readyMeaningsMap, 1);
         }
@@ -2248,6 +2250,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSession = new SpeakingSessionManager([...readyMeaningsMap.keys()], readyMeaningsMap);
         } else if (practiceMode === 'combined') {
             currentSession = new CombinedCardSessionManager(readyMeaningsMap, combinedGroupSize, combinedSPM);
+        } else if (practiceMode === 'scan') {
+            currentSession = new ScanSessionManager(readyMeaningsMap, scanPageSize);
         } else {
             currentSession = new SessionManager(readyMeaningsMap, 1);
         }
