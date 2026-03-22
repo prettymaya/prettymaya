@@ -215,10 +215,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ─── Font Size Control ──────────────────────────────────
     let practiceScale = parseFloat(localStorage.getItem('practiceScale')) || 1;
     const practiceContainer = document.getElementById('practice-active');
+    if (practiceContainer) practiceContainer.style.overflowX = 'hidden';
     function applyScale() {
         if (practiceContainer) {
-            practiceContainer.style.setProperty('--practice-scale', practiceScale);
-            practiceContainer.style.fontSize = (practiceScale * 100) + '%';
+            practiceContainer.style.zoom = practiceScale;
+            // Compensate width so zoomed content doesn't overflow on mobile
+            practiceContainer.style.width = (100 / practiceScale) + '%';
         }
     }
     applyScale();
