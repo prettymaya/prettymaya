@@ -216,7 +216,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     let practiceScale = parseFloat(localStorage.getItem('practiceScale')) || 1;
     const practiceContainer = document.getElementById('practice-active');
     function applyScale() {
-        if (practiceContainer) practiceContainer.style.zoom = practiceScale;
+        if (practiceContainer) {
+            practiceContainer.style.setProperty('--practice-scale', practiceScale);
+            practiceContainer.style.fontSize = (practiceScale * 100) + '%';
+        }
     }
     applyScale();
 
