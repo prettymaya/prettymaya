@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" href="icon.png">
     <!-- Icons: FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="css/style.css?v=53">
+    <link rel="stylesheet" href="css/style.css?v=54">
 </head>
 <body>
 
@@ -277,6 +277,7 @@
                             <button class="btn btn-secondary" id="mode-speaking" style="background: rgba(249, 115, 22, 0.15); color: var(--warning); border-color: rgba(249, 115, 22, 0.3);">Konuşma Oyunu (AI)</button>
                             <button class="btn btn-secondary" id="mode-combined" style="background: rgba(168, 85, 247, 0.15); color: #a855f7; border-color: rgba(168, 85, 247, 0.3);">🃏 Birleşik Kart</button>
                             <button class="btn btn-secondary" id="mode-scan" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: rgba(56, 189, 248, 0.3);">📖 Hızlı Tarama</button>
+                            <button class="btn btn-secondary" id="mode-flow" style="background: rgba(236, 72, 153, 0.15); color: #ec4899; border-color: rgba(236, 72, 153, 0.3);">⚡ Akış Modu</button>
                         </div>
 
                         <!-- Combined Card Options (hidden by default) -->
@@ -547,6 +548,27 @@
                                 <button class="btn btn-primary btn-lg" id="btn-scan-next" style="flex: 1; max-width: 200px;">
                                     Sonraki <i class="fa-solid fa-chevron-right"></i>
                                 </button>
+                            </div>
+                        </div>
+
+                        <!-- Flow Phase -->
+                        <div id="phase-flow" style="display: none;">
+                            <div class="flow-container">
+                                <div class="flow-progress-info">
+                                    <span id="flow-counter">0 / 0</span>
+                                    <div class="flow-controls">
+                                        <button class="btn btn-ghost btn-sm" id="btn-flow-pause" title="Duraklat"><i class="fa-solid fa-pause"></i></button>
+                                        <button class="btn btn-ghost btn-sm" id="btn-flow-skip" title="Atla"><i class="fa-solid fa-forward"></i></button>
+                                    </div>
+                                </div>
+                                <div class="flow-timer-bar"><div class="flow-timer-fill" id="flow-timer-fill"></div></div>
+                                <div class="flow-word" id="flow-word"></div>
+                                <div class="flow-reveal" id="flow-reveal" style="opacity: 0;">
+                                    <div class="flow-turkish" id="flow-turkish"></div>
+                                    <div class="flow-english-def" id="flow-english-def"></div>
+                                    <div class="flow-sentence" id="flow-sentence"></div>
+                                    <div class="flow-sentence-tr" id="flow-sentence-tr"></div>
+                                </div>
                             </div>
                         </div>
 

@@ -644,3 +644,58 @@ class ScanSessionManager {
         }
     }
 }
+
+class FlowSessionManager {
+    constructor(meaningSentencesMap) {
+        this.allItems = [];
+        this.position = 0;
+        this.currentCard = null;
+
+        for (const [mId, sentences] of meaningSentencesMap) {
+            if (sentences.length === 0) continue;
+            const sentence = sentences[Math.floor(Math.random() * sentences.length)];
+            this.allItems.push({
+                meaningId: mId,
+                word: sentence.word,
+                hint: sentence.hint || '',
+                englishDefinition: sentence.englishDefinition || '',
+                sentence: sentence,
+                allSentences: sentences
+            });
+        }
+
+        // Shuffle
+        for (let i = this.allItems.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.allItems[i], this.allItems[j]] = [this.allItems[j], this.allItems[i]];
+        }
+
+        this.stats = { total: this.allItems.length, correct: 0, incorrect: 0 };
+        this.mainQueue = this.allItems.slice();
+    }
+
+    getNextCard() {
+        if (this.position < this.allItems.length) {
+            this.currentCard = this.allItems[this.position];
+            this.position++;
+            this.stats.correct = this.position;
+            this.mainQueue = this.allItems.slice(this.position);
+            return this.currentCard;
+        }
+        this.currentCard = null;
+        return null;
+    }
+
+    getProgress() {
+        return {
+            totalWords: this.stats.total,
+            remaining: this.stats.total - this.position,
+            percentage: this.stats.total > 0 ? Math.round((this.position / this.stats.total) * 100) : 0,
+            stats: this.stats
+        };
+    }
+
+    handleAnswer(isCorrect) {
+        // No-op for flow mode
+    }
+}

@@ -145,6 +145,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         scanPageIndicator: document.getElementById('scan-page-indicator'),
         btnScanPrev: document.getElementById('btn-scan-prev'),
         btnScanNext: document.getElementById('btn-scan-next'),
+
+        // Flow Mode Phase
+        btnModeFlow: document.getElementById('mode-flow'),
+        phaseFlow: document.getElementById('phase-flow'),
+        flowWord: document.getElementById('flow-word'),
+        flowReveal: document.getElementById('flow-reveal'),
+        flowTurkish: document.getElementById('flow-turkish'),
+        flowEnglishDef: document.getElementById('flow-english-def'),
+        flowSentence: document.getElementById('flow-sentence'),
+        flowSentenceTr: document.getElementById('flow-sentence-tr'),
+        flowCounter: document.getElementById('flow-counter'),
+        flowTimerFill: document.getElementById('flow-timer-fill'),
+        btnFlowPause: document.getElementById('btn-flow-pause'),
+        btnFlowSkip: document.getElementById('btn-flow-skip'),
         
         resIcon: document.getElementById('res-icon'),
         resWord: document.getElementById('res-word'),
@@ -196,8 +210,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     let cancelGeneration = false;
     let currentSession = null;
     let selectedWordCount = 20;
-    let practiceMode = 'recall'; // 'recall' | 'reading' | 'mixed'
+    let practiceMode = 'recall'; // 'recall' | 'reading' | 'mixed' | 'scan' | 'flow'
     let currentCardMode = 'recall';
+
+    // Flow mode state
+    let flowTimer = null;
+    let flowRevealTimer = null;
+    let flowTickInterval = null;
+    let flowPaused = false;
     let searchTimeout = null;
     let selectedCategoryId = 'all'; // For word list filtering
     let practiceSource = 'all'; // 'all' or 'category'
@@ -2149,6 +2169,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSession = new CombinedCardSessionManager(readyMeaningsMap, combinedGroupSize, combinedSPM);
         } else if (practiceMode === 'scan') {
             currentSession = new ScanSessionManager(readyMeaningsMap, scanPageSize);
+        } else if (practiceMode === 'flow') {
+            currentSession = new FlowSessionManager(readyMeaningsMap);
         } else {
             currentSession = new SessionManager(readyMeaningsMap, 1);
         }
@@ -2257,6 +2279,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSession = new CombinedCardSessionManager(readyMeaningsMap, combinedGroupSize, combinedSPM);
         } else if (practiceMode === 'scan') {
             currentSession = new ScanSessionManager(readyMeaningsMap, scanPageSize);
+        } else if (practiceMode === 'flow') {
+            currentSession = new FlowSessionManager(readyMeaningsMap);
         } else {
             currentSession = new SessionManager(readyMeaningsMap, 1);
         }
@@ -2332,6 +2356,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (els.btnModeSpeaking) els.btnModeSpeaking.className = 'btn btn-secondary';
         if (els.btnModeCombined) els.btnModeCombined.className = 'btn btn-secondary';
         if (els.btnModeScan) els.btnModeScan.className = 'btn btn-secondary';
+        if (els.btnModeFlow) els.btnModeFlow.className = 'btn btn-secondary';
         if (els.combinedOptions) els.combinedOptions.style.display = 'none';
         if (els.scanOptions) els.scanOptions.style.display = 'none';
     }
@@ -2355,6 +2380,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Hızlı taramada kaç anlam işlemek istiyorsun?';
             els.countSelectors[0].parentElement.style.display = 'flex';
             if (els.scanOptions) els.scanOptions.style.display = 'block';
+        });
+    }
+
+    if (els.btnModeFlow) {
+        els.btnModeFlow.addEventListener('click', () => {
+            practiceMode = 'flow';
+            resetAllModeButtons();
+            els.btnModeFlow.className = 'btn btn-primary';
+            els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Akış modunda kaç anlam ile çalışmak istiyorsun?';
+            els.countSelectors[0].parentElement.style.display = 'flex';
         });
     }
 
@@ -2495,6 +2530,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     els.btnQuitSession.addEventListener('click', () => {
+        clearFlowTimers();
         if(confirm('Oturumu kaydet ve sonra devam et?')) {
             saveSessionState();
             els.practiceActive.style.display = 'none';
@@ -2590,6 +2626,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSession = new CombinedCardSessionManager(filteredMap, combinedGroupSize, combinedSPM);
         } else if (practiceMode === 'scan') {
             currentSession = new ScanSessionManager(filteredMap, scanPageSize);
+        } else if (practiceMode === 'flow') {
+            currentSession = new FlowSessionManager(filteredMap);
         } else {
             currentSession = new SessionManager(filteredMap, 1);
         }
@@ -2615,7 +2653,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const prog = currentSession.getProgress();
         let displayCurrent = 1;
         
-        if (practiceMode === 'reading' || practiceMode === 'warmup' || practiceMode === 'speaking' || practiceMode === 'combined' || practiceMode === 'scan') {
+        if (practiceMode === 'reading' || practiceMode === 'warmup' || practiceMode === 'speaking' || practiceMode === 'combined' || practiceMode === 'scan' || practiceMode === 'flow') {
             displayCurrent = prog.stats.correct || 1;
         } else {
             const retries = currentSession.retryInserts ? currentSession.retryInserts.length : 0;
@@ -2934,6 +2972,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        // ─── Flow Mode ────────────────────────────────────────
+        if (practiceMode === 'flow') {
+            els.phaseQuestion.style.display = 'none';
+            els.phaseResult.classList.remove('visible');
+            els.phaseWriting.classList.remove('visible');
+            els.phaseReading.style.display = 'none';
+            els.phaseWarmup.style.display = 'none';
+            if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
+            if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
+            if (els.phaseCombined) els.phaseCombined.style.display = 'none';
+            if (els.phaseScan) els.phaseScan.style.display = 'none';
+            if (els.phaseFlow) els.phaseFlow.style.display = 'block';
+
+            renderFlowCard(card);
+            return;
+        }
+
         // ─── Scan Mode ────────────────────────────────────────
         if (card.type === 'scan-page' && practiceMode === 'scan') {
             els.phaseQuestion.style.display = 'none';
@@ -2944,6 +2999,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
             if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
             if (els.phaseCombined) els.phaseCombined.style.display = 'none';
+            if (els.phaseFlow) els.phaseFlow.style.display = 'none';
             
             renderScanPage(card);
             return;
@@ -2956,6 +3012,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
         if (els.phaseCombined) els.phaseCombined.style.display = 'none';
         if (els.phaseScan) els.phaseScan.style.display = 'none';
+        if (els.phaseFlow) els.phaseFlow.style.display = 'none';
 
         // Check if retry
         const state = currentSession.wordState.get(card.cardKey);
@@ -3301,6 +3358,114 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Session Complete UI
+    // ─── Flow Mode Rendering ─────────────────────────────────
+    function clearFlowTimers() {
+        if (flowTimer) { clearTimeout(flowTimer); flowTimer = null; }
+        if (flowRevealTimer) { clearTimeout(flowRevealTimer); flowRevealTimer = null; }
+        if (flowTickInterval) { clearInterval(flowTickInterval); flowTickInterval = null; }
+    }
+
+    function renderFlowCard(card) {
+        clearFlowTimers();
+        flowPaused = false;
+        if (els.btnFlowPause) {
+            els.btnFlowPause.innerHTML = '<i class="fa-solid fa-pause"></i>';
+        }
+
+        const prog = currentSession.getProgress();
+        els.flowCounter.textContent = `${prog.stats.correct} / ${prog.totalWords}`;
+
+        // Phase 1: Show word only
+        els.flowWord.textContent = card.word;
+        els.flowWord.style.animation = 'none';
+        void els.flowWord.offsetHeight; // trigger reflow
+        els.flowWord.style.animation = 'flowPulse 0.4s ease-out';
+        els.flowReveal.style.opacity = '0';
+
+        // Prepare reveal content
+        const s = card.sentence;
+        els.flowTurkish.textContent = '🇹🇷 ' + (s.hint || '');
+        
+        if (card.englishDefinition && card.englishDefinition !== 'Anlam bulunamadı') {
+            els.flowEnglishDef.textContent = '🇬🇧 ' + card.englishDefinition;
+            els.flowEnglishDef.style.display = 'block';
+        } else {
+            els.flowEnglishDef.style.display = 'none';
+        }
+
+        const parts = s.sentence.split('___');
+        const sentenceHtml = parts[0] + '<span class="flow-highlight">' + s.answer + '</span>' + (parts[1] || '');
+        els.flowSentence.innerHTML = sentenceHtml;
+        els.flowSentenceTr.textContent = s.turkish || '';
+
+        // Timer bar animation
+        els.flowTimerFill.style.transition = 'none';
+        els.flowTimerFill.style.width = '0%';
+
+        let elapsed = 0;
+        const WORD_PHASE = 2000; // 2s word only
+        const REVEAL_PHASE = 2000; // 2s with meaning
+        const TOTAL = WORD_PHASE + REVEAL_PHASE;
+        const TICK = 50;
+
+        flowTickInterval = setInterval(() => {
+            if (flowPaused) return;
+            elapsed += TICK;
+            const pct = Math.min((elapsed / TOTAL) * 100, 100);
+            els.flowTimerFill.style.width = pct + '%';
+        }, TICK);
+
+        // Phase 2: Reveal meaning after 2s
+        flowRevealTimer = setTimeout(() => {
+            els.flowReveal.style.opacity = '1';
+        }, WORD_PHASE);
+
+        // Phase 3: Auto-advance after 4s total
+        flowTimer = setTimeout(() => {
+            flowAdvanceNext();
+        }, TOTAL);
+
+        updateProgressUI();
+    }
+
+    function flowAdvanceNext() {
+        clearFlowTimers();
+        const card = currentSession.getNextCard();
+        if (!card) {
+            finishSessionUI();
+        } else {
+            renderFlowCard(card);
+            updateProgressUI();
+        }
+    }
+
+    // Flow Pause/Resume
+    if (els.btnFlowPause) {
+        els.btnFlowPause.addEventListener('click', () => {
+            if (!flowPaused) {
+                flowPaused = true;
+                if (flowTimer) { clearTimeout(flowTimer); flowTimer = null; }
+                if (flowRevealTimer) { clearTimeout(flowRevealTimer); flowRevealTimer = null; }
+                els.btnFlowPause.innerHTML = '<i class="fa-solid fa-play"></i>';
+            } else {
+                flowPaused = false;
+                // Resume: reveal immediately if not shown, then advance after 2s
+                els.flowReveal.style.opacity = '1';
+                flowTimer = setTimeout(() => {
+                    flowAdvanceNext();
+                }, 2000);
+                els.btnFlowPause.innerHTML = '<i class="fa-solid fa-pause"></i>';
+            }
+        });
+    }
+
+    // Flow Skip
+    if (els.btnFlowSkip) {
+        els.btnFlowSkip.addEventListener('click', () => {
+            flowAdvanceNext();
+        });
+    }
+
     function finishSessionUI() {
         clearSavedSession();
         els.practiceActive.style.display = 'none';

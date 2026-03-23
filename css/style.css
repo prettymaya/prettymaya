@@ -2011,3 +2011,148 @@ option {
     }
 }
 
+/* ─── Flow Mode ─────────────────────────────────── */
+.flow-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 55vh;
+    padding: 20px;
+    text-align: center;
+}
+
+.flow-progress-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 500px;
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.flow-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.flow-timer-bar {
+    width: 100%;
+    max-width: 500px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    margin-bottom: 40px;
+    overflow: hidden;
+}
+
+.flow-timer-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #ec4899, #f472b6);
+    border-radius: 2px;
+    transition: width 0.1s linear;
+}
+
+.flow-word {
+    font-size: 3rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #ec4899, #f472b6, #fb7185);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.03em;
+    text-transform: lowercase;
+    margin-bottom: 28px;
+    animation: flowPulse 0.4s ease-out;
+}
+
+@keyframes flowPulse {
+    0% { transform: scale(0.8); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.flow-reveal {
+    width: 100%;
+    max-width: 500px;
+    transition: opacity 0.35s ease-in;
+}
+
+.flow-turkish {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #fbbf24;
+    margin-bottom: 14px;
+    text-shadow: 0 0 16px rgba(251, 191, 36, 0.2);
+}
+
+.flow-english-def {
+    font-size: 1rem;
+    color: #34d399;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 10px;
+    padding: 10px 16px;
+    margin-bottom: 14px;
+    line-height: 1.5;
+    font-weight: 500;
+}
+
+.flow-sentence {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 14px 18px;
+    line-height: 1.7;
+    margin-bottom: 8px;
+}
+
+.flow-sentence .flow-highlight {
+    color: #ec4899;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: rgba(236, 72, 153, 0.35);
+}
+
+.flow-sentence-tr {
+    font-size: 0.95rem;
+    color: #c4b5fd;
+    font-style: italic;
+    opacity: 0.85;
+    line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+    .flow-container {
+        min-height: 45vh;
+        padding: 16px;
+    }
+
+    .flow-word {
+        font-size: 2.2rem;
+        margin-bottom: 20px;
+    }
+
+    .flow-turkish {
+        font-size: 1.15rem;
+    }
+
+    .flow-english-def {
+        font-size: 0.92rem;
+        padding: 8px 14px;
+    }
+
+    .flow-sentence {
+        font-size: 1rem;
+        padding: 12px 16px;
+    }
+
+    .flow-timer-bar {
+        margin-bottom: 28px;
+    }
+}
