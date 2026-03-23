@@ -238,5 +238,44 @@ Example output:
             console.error("Gemini JSON Parsing Error:", textResponse);
             throw new Error("Gemini geçerli bir JSON formatı döndürmedi.");
         }
+    },
+
+    async translateDefinition(word, englishDefinition) {
+        const apiKey = await this.getApiKey();
+        if (!apiKey) throw new Error('API anahtarı bulunamadı');
+
+        const prompt = `Sen bir İngilizce-Türkçe sözlük uzmanısın.
+
+Görev: Aşağıdaki İngilizce kelimenin belirtilen anlamını kısa, net ve doğal Türkçeye çevir.
+
+Kelime: "${word}"
+İngilizce tanım: "${englishDefinition}"
+
+KURALLAR:
+1. Çeviri kısa olmalı (1-2 cümle MAX)
+2. Doğal, günlük Türkçe kullan (ders kitabı değil, konuşma dili)
+3. Kelimenin bu anlamda nasıl kullanıldığını net şekilde aktar
+4. SADECE Türkçe çeviriyi yaz, başka hiçbir şey ekleme (açıklama, not, vs.)`;
+
+        const url = `${this.BASE_URL}/${this.MODEL}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                    temperature: 0.1,
+                    maxOutputTokens: 256,
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error?.message || 'Gemini API Hatası');
+        }
+
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text.trim();
     }
 };

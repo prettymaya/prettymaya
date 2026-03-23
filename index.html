@@ -223,6 +223,20 @@
                         <button class="btn btn-secondary btn-sm" id="btn-copy-list" style="width: 100%; margin-top: 8px;"><i class="fa-solid fa-copy"></i> Kopyala</button>
                     </div>
                 </div>
+
+                <!-- TR Definition Analysis -->
+                <div style="background: var(--bg-glass); border-radius: 12px; padding: 16px; margin-top: 16px; border: 1px solid var(--border);">
+                    <h4 style="font-size: 0.95rem; color: #fbbf24; margin-bottom: 12px;"><i class="fa-solid fa-language"></i> Türkçe Anlam Çevirici</h4>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn btn-secondary btn-sm" id="btn-analyze-tr-defs">
+                            <i class="fa-solid fa-magnifying-glass-chart"></i> Analiz Et
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="btn-bulk-translate-all" style="color: #fbbf24;" disabled>
+                            <i class="fa-solid fa-language"></i> Eksikleri Çevir
+                        </button>
+                    </div>
+                    <div id="tr-analysis-result" style="margin-top: 10px; font-size: 0.82rem; color: var(--text-secondary);"></div>
+                </div>
             </section>
 
             <!-- 3. Practice View -->
@@ -816,6 +830,9 @@
                 <button class="btn btn-danger btn-sm" id="btn-delete-word">Kelimeyi Sil</button>
                 <button class="btn btn-secondary btn-sm" id="btn-detail-generate-all" style="color:var(--accent-purple-light);">
                     <i class="fa-solid fa-plus"></i> Tümüne +3 Üret
+                </button>
+                <button class="btn btn-secondary btn-sm" id="btn-bulk-translate-word" style="color: #fbbf24;">
+                    <i class="fa-solid fa-language"></i> Tümüne 🇹🇷 Çevir
                 </button>
                 <button class="btn btn-secondary" id="btn-close-detail-modal2">Kapat</button>
             </div>

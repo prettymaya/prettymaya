@@ -414,6 +414,23 @@ const DB = {
         return addedIds;
     },
 
+    async updateMeaning(id, fields) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('meanings', 'readwrite');
+            const store = tx.objectStore('meanings');
+            const getReq = store.get(Number(id));
+            getReq.onsuccess = () => {
+                const meaning = getReq.result;
+                if (!meaning) return reject(new Error('Anlam bulunamadı'));
+                Object.assign(meaning, fields);
+                const putReq = store.put(meaning);
+                putReq.onsuccess = () => resolve(meaning);
+                putReq.onerror = () => reject(putReq.error);
+            };
+            getReq.onerror = () => reject(getReq.error);
+        });
+    },
+
     async deleteMeaning(id) {
         return new Promise((resolve, reject) => {
             const tx = this.db.transaction('meanings', 'readwrite');

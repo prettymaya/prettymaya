@@ -1277,6 +1277,66 @@ document.addEventListener('DOMContentLoaded', async () => {
         navigator.clipboard.writeText(text).then(() => showToast('Liste panoya kopyalandı!', 'success'));
     });
 
+    // ─── TR Definition Analysis & Bulk Translate ──────────────
+    let trAnalysisMissing = [];
+
+    document.getElementById('btn-analyze-tr-defs')?.addEventListener('click', async () => {
+        const resultDiv = document.getElementById('tr-analysis-result');
+        const bulkBtn = document.getElementById('btn-bulk-translate-all');
+        resultDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analiz ediliyor...';
+        
+        const allMeanings = await DB.getAllMeanings();
+        const withTr = allMeanings.filter(m => m.turkishDefinition);
+        const withoutTr = allMeanings.filter(m => !m.turkishDefinition && m.definition);
+        trAnalysisMissing = withoutTr;
+        
+        resultDiv.innerHTML = `
+            <div style="margin-top: 8px;">
+                <span style="color: var(--success);">✅ Türkçesi var: <strong>${withTr.length}</strong></span> &nbsp;|&nbsp;
+                <span style="color: var(--error);">❌ Türkçesi yok: <strong>${withoutTr.length}</strong></span> &nbsp;|&nbsp;
+                <span style="color: var(--text-muted);">Toplam: <strong>${allMeanings.length}</strong></span>
+            </div>
+        `;
+        
+        if (withoutTr.length > 0) {
+            bulkBtn.disabled = false;
+            bulkBtn.innerHTML = `<i class="fa-solid fa-language"></i> ${withoutTr.length} Anlamı Çevir`;
+        } else {
+            bulkBtn.disabled = true;
+            bulkBtn.innerHTML = '<i class="fa-solid fa-check"></i> Tüm çeviriler tamam';
+        }
+    });
+
+    document.getElementById('btn-bulk-translate-all')?.addEventListener('click', async () => {
+        if (trAnalysisMissing.length === 0) return;
+        const bulkBtn = document.getElementById('btn-bulk-translate-all');
+        const resultDiv = document.getElementById('tr-analysis-result');
+        bulkBtn.disabled = true;
+        
+        const total = trAnalysisMissing.length;
+        let done = 0;
+        let errors = 0;
+        
+        for (const m of trAnalysisMissing) {
+            try {
+                const turkishDef = await GeminiService.translateDefinition(m.word, m.definition);
+                await DB.updateMeaning(m.id, { turkishDefinition: turkishDef });
+                done++;
+            } catch (err) {
+                console.error('Bulk translate error for', m.word, ':', err);
+                errors++;
+                done++;
+            }
+            bulkBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${done}/${total}`;
+            resultDiv.innerHTML = `<span style="color: #fbbf24;">⏳ İşleniyor: ${done}/${total} (${errors} hata)</span>`;
+        }
+        
+        trAnalysisMissing = [];
+        showToast(`Çeviri tamamlandı! ${done - errors} başarılı, ${errors} hata.`, 'success');
+        bulkBtn.innerHTML = '<i class="fa-solid fa-check"></i> Tamamlandı';
+        resultDiv.innerHTML = `<span style="color: var(--success);">✅ Tüm çeviriler tamamlandı! (${errors} hata)</span>`;
+    });
+
     // ─── Practice Source Selector ────────────────────────────
     async function renderPracticeCategoryCheckboxes() {
         const container = document.getElementById('practice-category-checkboxes');
@@ -1878,16 +1938,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                     
                     // Header Row for Meaning
                     const headerTr = document.createElement('tr');
+                    const trDef = group.meaning.turkishDefinition
+                        ? `<div style="color: #fbbf24; font-size: 0.82rem; margin-top: 4px; font-weight: 500;">🇹🇷 ${group.meaning.turkishDefinition} <button class="btn-del-tr-def" data-meaning-id="${key}" style="background:none;border:none;color:var(--error);cursor:pointer;font-size:0.7rem;padding:1px 4px;" title="TR anlamı sil">✕</button></div>`
+                        : '';
+                    const trBtn = group.meaning.turkishDefinition
+                        ? ''
+                        : `<button class="btn btn-ghost btn-sm btn-translate-def" data-word="${word}" data-meaning-id="${key}" title="Türkçe anlam üret" style="color: #fbbf24; font-size: 0.7rem; padding: 2px 8px;"><i class="fa-solid fa-language"></i> 🇹🇷</button>`;
                     headerTr.innerHTML = `
                         <td colspan="3" style="background: rgba(255,255,255,0.03); padding-top: 15px;">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <div style="color: var(--accent-purple-light); font-weight:600;">
+                                <div style="color: var(--accent-purple-light); font-weight:600; flex: 1;">
                                     <span style="border: 1px solid var(--accent-purple-light); padding: 2px 6px; border-radius: 4px; font-size:0.7rem; margin-right: 8px;">${group.meaning.partOfSpeech.toUpperCase()}</span>
                                     ${group.meaning.definition}
+                                    ${trDef}
                                 </div>
-                                <button class="btn btn-ghost btn-sm btn-generate-meaning-sentence" data-word="${word}" data-meaning-id="${key}" title="Bu anlama 3 cümle daha üret" style="color: var(--accent-blue);">
-                                    <i class="fa-solid fa-robot"></i> +3 Üret
-                                </button>
+                                <div style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;">
+                                    ${trBtn}
+                                    <button class="btn btn-ghost btn-sm btn-generate-meaning-sentence" data-word="${word}" data-meaning-id="${key}" title="Bu anlama 3 cümle daha üret" style="color: var(--accent-blue);">
+                                        <i class="fa-solid fa-robot"></i> +3 Üret
+                                    </button>
+                                </div>
                             </div>
                         </td>
                     `;
@@ -1943,6 +2013,70 @@ document.addEventListener('DOMContentLoaded', async () => {
                     generateSentencesForSpecificMeaning(w, Number(mId), 3);
                 });
             });
+
+            // Single translate meaning to Turkish
+            document.querySelectorAll('.btn-translate-def').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const w = e.currentTarget.dataset.word;
+                    const mId = Number(e.currentTarget.dataset.meaningId);
+                    const btnEl = e.currentTarget;
+                    btnEl.disabled = true;
+                    btnEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+                    try {
+                        const meanings = await DB.getMeaningsForWord(w);
+                        const meaning = meanings.find(m => m.id === mId);
+                        if (!meaning) throw new Error('Anlam bulunamadı');
+                        const turkishDef = await GeminiService.translateDefinition(w, meaning.definition);
+                        await DB.updateMeaning(mId, { turkishDefinition: turkishDef });
+                        showToast('Türkçe anlam eklendi!', 'success');
+                        showWordDetail(w);
+                    } catch (err) {
+                        showToast('Çeviri başarısız: ' + err.message, 'error');
+                        btnEl.disabled = false;
+                        btnEl.innerHTML = '<i class="fa-solid fa-language"></i> 🇹🇷';
+                    }
+                });
+            });
+
+            // Delete TR definition
+            document.querySelectorAll('.btn-del-tr-def').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const mId = Number(e.currentTarget.dataset.meaningId);
+                    await DB.updateMeaning(mId, { turkishDefinition: null });
+                    showToast('Türkçe anlam silindi.', 'info');
+                    showWordDetail(currentDetailWord);
+                });
+            });
+
+            // Bulk translate all meanings for this word
+            const bulkBtn = document.getElementById('btn-bulk-translate-word');
+            if (bulkBtn) {
+                bulkBtn.addEventListener('click', async () => {
+                    const w = currentDetailWord;
+                    if (!w) return;
+                    const meanings = await DB.getMeaningsForWord(w);
+                    const toTranslate = meanings.filter(m => !m.turkishDefinition && m.definition);
+                    if (toTranslate.length === 0) {
+                        showToast('Tüm anlamların Türkçesi zaten mevcut.', 'info'); return;
+                    }
+                    bulkBtn.disabled = true;
+                    bulkBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 0/${toTranslate.length}`;
+                    let done = 0;
+                    for (const m of toTranslate) {
+                        try {
+                            const turkishDef = await GeminiService.translateDefinition(w, m.definition);
+                            await DB.updateMeaning(m.id, { turkishDefinition: turkishDef });
+                            done++;
+                            bulkBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${done}/${toTranslate.length}`;
+                        } catch (err) {
+                            console.error('Bulk translate error:', err);
+                            done++;
+                        }
+                    }
+                    showToast(`${done} anlam çevrildi!`, 'success');
+                    showWordDetail(w);
+                });
+            }
         }
         
         els.modalWordDetails.classList.add('visible');
@@ -2152,6 +2286,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 let meaningData = wordMeanings.find(m => m.id.toString() === mId.toString());
                 if (!meaningData && wordMeanings.length > 0) meaningData = wordMeanings[0];
                 s.englishDefinition = meaningData ? meaningData.definition : "Anlam bulunamadı";
+                s.turkishDefinition = meaningData ? meaningData.turkishDefinition : null;
 
                 meaningGroups[mId].push(s);
             });
@@ -2262,6 +2397,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     let meaningData = wordMeanings.find(m => m.id.toString() === mId.toString());
                     if (!meaningData && wordMeanings.length > 0) meaningData = wordMeanings[0];
                     s.englishDefinition = meaningData ? meaningData.definition : "Anlam bulunamadı";
+                    s.turkishDefinition = meaningData ? meaningData.turkishDefinition : null;
                     
                     meaningGroups[mId].push(s);
                 });
@@ -2602,6 +2738,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 let meaningData = wordMeanings.find(m => m.id.toString() === mId.toString());
                 if (!meaningData && wordMeanings.length > 0) meaningData = wordMeanings[0];
                 s.englishDefinition = meaningData ? meaningData.definition : "Anlam bulunamadı";
+                s.turkishDefinition = meaningData ? meaningData.turkishDefinition : null;
                 
                 meaningGroups[mId].push(s);
             });
@@ -2814,25 +2951,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 // card is an array of up to 3 cards for speaking mode
                 card.forEach((c, index) => {
-                    const meaningsHtml = c.meanings.map(m => `<div style="color: var(--warning); font-size: 0.8rem; margin-bottom: 2px;">• ${m}</div>`).join('');
-                    const cardHtml = `
-                        <div style="background: var(--bg-glass); border-radius: 12px; padding: 16px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; min-width: 0;">
-                            <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-                                <h3 style="color: var(--warning); font-size: 1.3rem; font-weight: 800; text-transform: lowercase; word-break: break-word; margin: 0;">${c.word}</h3>
-                                <button onclick="speakWord('${c.word.replace(/'/g, "\\'")}')"
-                                    style="background: none; border: none; color: var(--info); cursor: pointer; font-size: 1rem; padding: 2px 4px; flex-shrink: 0;"
-                                    title="Seslendir">🔊</button>
-                            </div>
-                            ${c.englishDefinition && c.englishDefinition !== "Anlam bulunamadı" ? `<div style="color: var(--text-primary); font-size: 0.78rem; font-weight: 500; background: rgba(16, 185, 129, 0.1); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 8px; text-align: left;">EN: ${c.englishDefinition}</div>` : ''}
-                            <div style="background: rgba(249, 115, 22, 0.1); border: 1px dashed rgba(249, 115, 22, 0.3); border-radius: 6px; padding: 8px; text-align: left;">
-                                ${meaningsHtml}
-                            </div>
-                        </div>
-                    `;
+                    // Prefer Gemini turkishDefinition, fallback to old hint meanings
+                    const trDefHtml = c.turkishDefinition
+                        ? `<div style="color: #fbbf24; font-size: 0.85rem; font-weight: 600; background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 8px; padding: 8px 10px; text-align: left;">🇹🇷 ${c.turkishDefinition}</div>`
+                        : (c.meanings.length > 0 ? `<div style="color: #fbbf24; font-size: 0.85rem; font-weight: 600; background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 8px; padding: 8px 10px; text-align: left;">🇹🇷 ${c.meanings.join(', ')}</div>` : '');
+                    
+                    const enDefHtml = c.englishDefinition && c.englishDefinition !== "Anlam bulunamadı"
+                        ? `<div style="color: #34d399; font-size: 0.78rem; font-weight: 500; background: rgba(52, 211, 153, 0.06); border: 1px solid rgba(52, 211, 153, 0.15); border-radius: 8px; padding: 8px 10px; text-align: left;">🇬🇧 ${c.englishDefinition}</div>`
+                        : '';
+
+                    const safeWord = c.word.replace(/'/g, "\\'");
+                    const cardHtml = '<div style="background: var(--bg-glass); border-radius: 12px; padding: 16px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; min-width: 0;">' +
+                        '<div style="display: flex; align-items: center; justify-content: center; gap: 8px;">' +
+                            '<h3 style="color: #e2e8f0; font-size: 1.3rem; font-weight: 800; text-transform: lowercase; word-break: break-word; margin: 0;">' + c.word + '</h3>' +
+                            '<button onclick="speakWord(\'' + safeWord + '\')" style="background: none; border: none; color: var(--info); cursor: pointer; font-size: 1rem; padding: 2px 4px; flex-shrink: 0;" title="Seslendir">🔊</button>' +
+                        '</div>' +
+                        trDefHtml +
+                        enDefHtml +
+                    '</div>';
                     els.speakingWordsContainer.insertAdjacentHTML('beforeend', cardHtml);
                 });
             }
-            
+
+
+
             if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'block';
             if (els.btnSpeakingNext) els.btnSpeakingNext.focus();
             return;

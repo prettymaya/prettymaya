@@ -362,12 +362,14 @@ class SpeakingSessionManager {
             if (sentences.length === 0) continue;
             const word = sentences[0].word;
             const englishDefinition = sentences[0].englishDefinition;
+            const turkishDefinition = sentences[0].turkishDefinition;
             const meanings = [...new Set(sentences.map(s => s.hint))];
 
             const cardData = {
                 word: word,
                 meaningId: mId,
                 englishDefinition: englishDefinition || "Anlam bulunamadı.",
+                turkishDefinition: turkishDefinition || null,
                 meanings: meanings
             };
 
