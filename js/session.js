@@ -348,7 +348,7 @@ class WarmUpSessionManager {
 }
 
 class SpeakingSessionManager {
-    constructor(meaningList, meaningSentencesMap) {
+    constructor(meaningList, meaningSentencesMap, repeatCount = 2) {
         this.meaningList = [...meaningList];
         this.meaningSentences = meaningSentencesMap;
         this.mainQueue = [];
@@ -356,23 +356,25 @@ class SpeakingSessionManager {
         this.stats = { total: 0, correct: 0, incorrect: 0 };
         this.currentCards = null;
 
-        // Build queue
+        // Build queue — each meaning appears `repeatCount` times
         for (const mId of this.meaningList) {
             const sentences = this.meaningSentences.get(mId) || [];
             if (sentences.length === 0) continue;
             const word = sentences[0].word;
             const englishDefinition = sentences[0].englishDefinition;
-            
-            const shuffledSentences = [...sentences].sort(() => 0.5 - Math.random());
-            const selectedSentences = shuffledSentences.slice(0, 3);
-            const meanings = selectedSentences.map(s => s.hint);
+            const meanings = [...new Set(sentences.map(s => s.hint))];
 
-            this.mainQueue.push({
+            const cardData = {
                 word: word,
                 meaningId: mId,
                 englishDefinition: englishDefinition || "Anlam bulunamadı.",
-                meanings: [...new Set(meanings)]
-            });
+                meanings: meanings
+            };
+
+            // Push repeatCount copies
+            for (let r = 0; r < repeatCount; r++) {
+                this.mainQueue.push({ ...cardData });
+            }
         }
         
         // Shuffle the entire queue
@@ -381,10 +383,38 @@ class SpeakingSessionManager {
             [this.mainQueue[i], this.mainQueue[j]] = [this.mainQueue[j], this.mainQueue[i]];
         }
         
-        // Chunk by 3 for standard layout
+        // Chunk by 3
         this.chunks = [];
         for (let i = 0; i < this.mainQueue.length; i += 3) {
             this.chunks.push(this.mainQueue.slice(i, i + 3));
+        }
+
+        // Fix constraint: no duplicate meaningId in the same chunk
+        for (let ci = 0; ci < this.chunks.length; ci++) {
+            const chunk = this.chunks[ci];
+            const seen = new Set();
+            for (let cardIdx = 0; cardIdx < chunk.length; cardIdx++) {
+                const card = chunk[cardIdx];
+                if (seen.has(card.meaningId)) {
+                    // Find a card in another chunk to swap with
+                    let swapped = false;
+                    for (let oi = ci + 1; oi < this.chunks.length && !swapped; oi++) {
+                        for (let oj = 0; oj < this.chunks[oi].length; oj++) {
+                            const other = this.chunks[oi][oj];
+                            // other must not conflict with current chunk, and card must not conflict with other chunk
+                            const otherChunkIds = this.chunks[oi].map((c, idx) => idx === oj ? null : c.meaningId);
+                            if (!seen.has(other.meaningId) && !otherChunkIds.includes(card.meaningId)) {
+                                // Swap
+                                this.chunks[ci][cardIdx] = other;
+                                this.chunks[oi][oj] = card;
+                                swapped = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                seen.add(this.chunks[ci][cardIdx].meaningId);
+            }
         }
         
         this.stats.total = this.chunks.length;

@@ -121,6 +121,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Speaking Phase
         btnModeSpeaking: document.getElementById('mode-speaking'),
+        speakingOptions: document.getElementById('speaking-options'),
         phaseSpeaking: document.getElementById('phase-speaking'),
         speakingWordsContainer: document.getElementById('speaking-words-container'),
         btnSpeakingNext: document.getElementById('btn-speaking-next'),
@@ -213,11 +214,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     let practiceMode = 'recall'; // 'recall' | 'reading' | 'mixed' | 'scan' | 'flow'
     let currentCardMode = 'recall';
 
+    // ─── Text-to-Speech ──────────────────────────────────
+    function speakWord(word) {
+        if (!window.speechSynthesis) return;
+        speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(word);
+        utter.lang = 'en-US';
+        utter.rate = 0.9;
+        speechSynthesis.speak(utter);
+    }
+    window.speakWord = speakWord; // expose for inline onclick
+
     // Flow mode state
     let flowTimer = null;
     let flowRevealTimer = null;
     let flowTickInterval = null;
     let flowPaused = false;
+    let speakingRepeatCount = 2;
     let searchTimeout = null;
     let selectedCategoryId = 'all'; // For word list filtering
     let practiceSource = 'all'; // 'all' or 'category'
@@ -2164,7 +2177,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (practiceMode === 'warmup') {
             currentSession = new WarmUpSessionManager(readyMeaningsMap, 1);
         } else if (practiceMode === 'speaking') {
-            currentSession = new SpeakingSessionManager([...readyMeaningsMap.keys()], readyMeaningsMap);
+            currentSession = new SpeakingSessionManager([...readyMeaningsMap.keys()], readyMeaningsMap, speakingRepeatCount);
         } else if (practiceMode === 'combined') {
             currentSession = new CombinedCardSessionManager(readyMeaningsMap, combinedGroupSize, combinedSPM);
         } else if (practiceMode === 'scan') {
@@ -2274,7 +2287,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (practiceMode === 'warmup') {
             currentSession = new WarmUpSessionManager(readyMeaningsMap, 1);
         } else if (practiceMode === 'speaking') {
-            currentSession = new SpeakingSessionManager([...readyMeaningsMap.keys()], readyMeaningsMap);
+            currentSession = new SpeakingSessionManager([...readyMeaningsMap.keys()], readyMeaningsMap, speakingRepeatCount);
         } else if (practiceMode === 'combined') {
             currentSession = new CombinedCardSessionManager(readyMeaningsMap, combinedGroupSize, combinedSPM);
         } else if (practiceMode === 'scan') {
@@ -2338,8 +2351,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             els.btnModeSpeaking.className = 'btn btn-primary';
             els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Sohbette kullanmak için kaç kelime istiyorsun?';
             els.countSelectors[0].parentElement.style.display = 'flex';
+            if (els.speakingOptions) els.speakingOptions.style.display = 'block';
         });
     }
+
+    // Speaking repeat count buttons
+    document.querySelectorAll('.speaking-repeat-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            speakingRepeatCount = parseInt(btn.dataset.repeat);
+            document.querySelectorAll('.speaking-repeat-btn').forEach(b => b.className = 'btn btn-secondary btn-sm speaking-repeat-btn');
+            btn.className = 'btn btn-primary btn-sm speaking-repeat-btn';
+        });
+    });
     
     // Combined card mode state
     let combinedGroupSize = 3;
@@ -2359,6 +2382,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (els.btnModeFlow) els.btnModeFlow.className = 'btn btn-secondary';
         if (els.combinedOptions) els.combinedOptions.style.display = 'none';
         if (els.scanOptions) els.scanOptions.style.display = 'none';
+        if (els.speakingOptions) els.speakingOptions.style.display = 'none';
     }
 
     if (els.btnModeCombined) {
@@ -2621,7 +2645,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (practiceMode === 'warmup') {
             currentSession = new WarmUpSessionManager(filteredMap, 1);
         } else if (practiceMode === 'speaking') {
-            currentSession = new SpeakingSessionManager([...filteredMap.keys()], filteredMap);
+            currentSession = new SpeakingSessionManager([...filteredMap.keys()], filteredMap, speakingRepeatCount);
         } else if (practiceMode === 'combined') {
             currentSession = new CombinedCardSessionManager(filteredMap, combinedGroupSize, combinedSPM);
         } else if (practiceMode === 'scan') {
@@ -2793,7 +2817,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const meaningsHtml = c.meanings.map(m => `<div style="color: var(--warning); font-size: 0.8rem; margin-bottom: 2px;">• ${m}</div>`).join('');
                     const cardHtml = `
                         <div style="background: var(--bg-glass); border-radius: 12px; padding: 16px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; min-width: 0;">
-                            <h3 style="color: var(--warning); font-size: 1.3rem; font-weight: 800; text-transform: lowercase; word-break: break-word; margin: 0;">${c.word}</h3>
+                            <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                <h3 style="color: var(--warning); font-size: 1.3rem; font-weight: 800; text-transform: lowercase; word-break: break-word; margin: 0;">${c.word}</h3>
+                                <button onclick="speakWord('${c.word.replace(/'/g, "\\'")}')"
+                                    style="background: none; border: none; color: var(--info); cursor: pointer; font-size: 1rem; padding: 2px 4px; flex-shrink: 0;"
+                                    title="Seslendir">🔊</button>
+                            </div>
                             ${c.englishDefinition && c.englishDefinition !== "Anlam bulunamadı" ? `<div style="color: var(--text-primary); font-size: 0.78rem; font-weight: 500; background: rgba(16, 185, 129, 0.1); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 8px; text-align: left;">EN: ${c.englishDefinition}</div>` : ''}
                             <div style="background: rgba(249, 115, 22, 0.1); border: 1px dashed rgba(249, 115, 22, 0.3); border-radius: 6px; padding: 8px; text-align: left;">
                                 ${meaningsHtml}
@@ -3159,6 +3188,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="scan-item-header">
                     <div class="scan-item-number">${globalNum}</div>
                     <div class="scan-item-word">${item.word}</div>
+                    <button onclick="speakWord('${item.word.replace(/'/g, "\\'")}')"
+                        style="background: none; border: none; color: var(--info); cursor: pointer; font-size: 0.95rem; padding: 2px 6px; flex-shrink: 0;"
+                        title="Seslendir">🔊</button>
                 </div>
                 ${englishHtml}
                 <div class="scan-item-turkish">🇹🇷 ${item.hint}</div>
@@ -3377,6 +3409,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Phase 1: Show word only
         els.flowWord.textContent = card.word;
+        speakWord(card.word);
         els.flowWord.style.animation = 'none';
         void els.flowWord.offsetHeight; // trigger reflow
         els.flowWord.style.animation = 'flowPulse 0.4s ease-out';
