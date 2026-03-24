@@ -1968,8 +1968,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         ? `<div style="color: #fbbf24; font-size: 0.82rem; margin-top: 4px; font-weight: 500;">🇹🇷 ${group.meaning.turkishDefinition} <button class="btn-del-tr-def" data-meaning-id="${key}" style="background:none;border:none;color:var(--error);cursor:pointer;font-size:0.7rem;padding:1px 4px;" title="TR anlamı sil">✕</button></div>`
                         : '';
                     const trBtn = group.meaning.turkishDefinition
-                        ? ''
-                        : `<button class="btn btn-ghost btn-sm btn-translate-def" data-word="${word}" data-meaning-id="${key}" title="Türkçe anlam üret" style="color: #fbbf24; font-size: 0.7rem; padding: 2px 8px;"><i class="fa-solid fa-language"></i> 🇹🇷</button>`;
+                        ? `<button class="btn btn-ghost btn-sm btn-edit-tr-def" data-word="${word}" data-meaning-id="${key}" title="TR çeviriyi düzenle" style="color: #fbbf24; font-size: 0.7rem; padding: 2px 8px;"><i class="fa-solid fa-pen"></i></button>`
+                        : `<button class="btn btn-ghost btn-sm btn-translate-def" data-word="${word}" data-meaning-id="${key}" title="Türkçe anlam üret (AI)" style="color: #fbbf24; font-size: 0.7rem; padding: 2px 8px;"><i class="fa-solid fa-language"></i> 🇹🇷</button><button class="btn btn-ghost btn-sm btn-manual-tr-def" data-word="${word}" data-meaning-id="${key}" title="El ile çeviri ekle" style="color: #fbbf24; font-size: 0.7rem; padding: 2px 8px;"><i class="fa-solid fa-pen"></i> ✍️</button>`;
                     headerTr.innerHTML = `
                         <td colspan="3" style="background: rgba(255,255,255,0.03); padding-top: 15px;">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -2060,6 +2060,37 @@ document.addEventListener('DOMContentLoaded', async () => {
                         showToast('Çeviri başarısız: ' + err.message, 'error');
                         btnEl.disabled = false;
                         btnEl.innerHTML = '<i class="fa-solid fa-language"></i> 🇹🇷';
+                    }
+                });
+            });
+
+            // Manual TR definition input
+            document.querySelectorAll('.btn-manual-tr-def').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const mId = Number(e.currentTarget.dataset.meaningId);
+                    const w = e.currentTarget.dataset.word;
+                    const input = prompt('Türkçe çeviriyi girin:');
+                    if (input && input.trim()) {
+                        await DB.updateMeaning(mId, { turkishDefinition: input.trim() });
+                        showToast('Türkçe anlam eklendi!', 'success');
+                        openWordDetails(w);
+                    }
+                });
+            });
+
+            // Edit TR definition
+            document.querySelectorAll('.btn-edit-tr-def').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const mId = Number(e.currentTarget.dataset.meaningId);
+                    const w = e.currentTarget.dataset.word;
+                    const meanings = await DB.getMeaningsForWord(w);
+                    const meaning = meanings.find(m => m.id === mId);
+                    const current = meaning?.turkishDefinition || '';
+                    const input = prompt('Türkçe çeviriyi düzenle:', current);
+                    if (input !== null && input.trim()) {
+                        await DB.updateMeaning(mId, { turkishDefinition: input.trim() });
+                        showToast('Türkçe anlam güncellendi!', 'success');
+                        openWordDetails(w);
                     }
                 });
             });
@@ -3155,9 +3186,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                             });
                         }
                     } catch (err) {
-                        showToast('Çeviri hatası: ' + err.message, 'error');
-                        btn.disabled = false;
-                        btn.innerHTML = '<i class="fa-solid fa-language"></i> 🇹🇷 Çeviri Üret';
+                        // On failure, offer manual input
+                        const manualInput = prompt(`"${word}" için AI çeviri başarısız oldu.\nEl ile Türkçe çeviri girin:`);
+                        if (manualInput && manualInput.trim()) {
+                            await DB.updateMeaning(meaningId, { turkishDefinition: manualInput.trim() });
+                            showToast('TR çeviri eklendi (el ile)!', 'success');
+                            card[idx].turkishDefinition = manualInput.trim();
+                            const cardEl = els.speakingWordsContainer.querySelector(`.speaking-card[data-card-idx="${idx}"]`);
+                            const trActionsEl = cardEl.querySelector('.speaking-tr-actions');
+                            if (trActionsEl) {
+                                trActionsEl.outerHTML = `<div class="speaking-tr-def" data-card-idx="${idx}">
+                                    <span>🇹🇷 ${manualInput.trim()}</span>
+                                    <button class="speaking-tr-del" data-card-idx="${idx}" data-meaning-id="${meaningId}" title="TR çeviriyi sil">✕</button>
+                                </div>`;
+                            }
+                        } else {
+                            showToast('Çeviri hatası: ' + err.message, 'error');
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fa-solid fa-language"></i> 🇹🇷 Çeviri Üret';
+                        }
                     }
                 }
                 
