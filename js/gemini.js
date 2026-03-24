@@ -276,6 +276,19 @@ KURALLAR:
         }
 
         const data = await response.json();
-        return data.candidates[0].content.parts[0].text.trim();
+        
+        // Gemini may block/filter some words — handle gracefully
+        if (!data.candidates || data.candidates.length === 0) {
+            const blockReason = data.promptFeedback?.blockReason || 'Bilinmeyen';
+            throw new Error(`API yanıt vermedi (sebep: ${blockReason})`);
+        }
+        
+        const candidate = data.candidates[0];
+        if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+            const finishReason = candidate.finishReason || 'Bilinmeyen';
+            throw new Error(`API boş yanıt döndü (finishReason: ${finishReason})`);
+        }
+        
+        return candidate.content.parts[0].text.trim();
     }
 };
