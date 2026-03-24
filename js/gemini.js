@@ -3,6 +3,20 @@ const GeminiService = {
     MODEL: 'gemini-3.1-flash-lite-preview',
     BASE_URL: 'https://generativelanguage.googleapis.com/v1beta/models',
 
+    // Safe extraction of text from Gemini API response
+    _extractText(data) {
+        if (!data.candidates || data.candidates.length === 0) {
+            const blockReason = data.promptFeedback?.blockReason || 'Bilinmeyen';
+            throw new Error(`API yanıt vermedi (sebep: ${blockReason})`);
+        }
+        const candidate = data.candidates[0];
+        if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+            const finishReason = candidate.finishReason || 'Bilinmeyen';
+            throw new Error(`API boş yanıt döndü (finishReason: ${finishReason})`);
+        }
+        return candidate.content.parts[0].text;
+    },
+
     async getApiKey() {
         return await DB.getSetting('gemini_api_key');
     },
@@ -106,7 +120,7 @@ IMPORTANT: Return ONLY a valid JSON object in this EXACT format. Do not use mark
         }
 
         const responseData = await response.json();
-        let textResponse = responseData.candidates[0].content.parts[0].text.trim();
+        let textResponse = this._extractText(responseData).trim();
         
         // Strip markdown if AI accidentally includes it
         if (textResponse.startsWith('\`\`\`json')) {
@@ -162,7 +176,7 @@ Example output:
         }
 
         const responseData = await response.json();
-        let textResponse = responseData.candidates[0].content.parts[0].text.trim();
+        let textResponse = this._extractText(responseData).trim();
         
         if (textResponse.startsWith('\`\`\`json')) {
             textResponse = textResponse.replace(/^\`\`\`json/, '').replace(/\`\`\`$/, '').trim();
@@ -216,7 +230,7 @@ Example output:
         }
 
         const data = await response.json();
-        const textResponse = data.candidates[0].content.parts[0].text;
+        const textResponse = this._extractText(data);
         
         try {
             const cleanJson = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -240,11 +254,13 @@ Example output:
         }
     },
 
-    async translateDefinition(word, englishDefinition) {
+    async translateDefinition(word, englishDefinition, _retry = false) {
         const apiKey = await this.getApiKey();
         if (!apiKey) throw new Error('API anahtarı bulunamadı');
 
-        const prompt = `Sen bir İngilizce-Türkçe sözlük uzmanısın.
+        const prompt = _retry
+            ? `Translate to Turkish (short): "${word}" means "${englishDefinition}". Write ONLY the Turkish translation.`
+            : `Sen bir İngilizce-Türkçe sözlük uzmanısın.
 
 Görev: Aşağıdaki İngilizce kelimenin belirtilen anlamını kısa, net ve doğal Türkçeye çevir.
 
@@ -257,12 +273,20 @@ KURALLAR:
 3. Kelimenin bu anlamda nasıl kullanıldığını net şekilde aktar
 4. SADECE Türkçe çeviriyi yaz, başka hiçbir şey ekleme (açıklama, not, vs.)`;
 
+        const safetySettings = [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+        ];
+
         const url = `${this.BASE_URL}/${this.MODEL}:generateContent?key=${apiKey}`;
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
+                safetySettings,
                 generationConfig: {
                     temperature: 0.1,
                     maxOutputTokens: 256,
@@ -275,20 +299,16 @@ KURALLAR:
             throw new Error(error.error?.message || 'Gemini API Hatası');
         }
 
-        const data = await response.json();
-        
-        // Gemini may block/filter some words — handle gracefully
-        if (!data.candidates || data.candidates.length === 0) {
-            const blockReason = data.promptFeedback?.blockReason || 'Bilinmeyen';
-            throw new Error(`API yanıt vermedi (sebep: ${blockReason})`);
+        try {
+            const data = await response.json();
+            return this._extractText(data).trim();
+        } catch (err) {
+            // Retry once with simplified prompt
+            if (!_retry) {
+                console.warn(`Retry for "${word}":`, err.message);
+                return this.translateDefinition(word, englishDefinition, true);
+            }
+            throw err;
         }
-        
-        const candidate = data.candidates[0];
-        if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
-            const finishReason = candidate.finishReason || 'Bilinmeyen';
-            throw new Error(`API boş yanıt döndü (finishReason: ${finishReason})`);
-        }
-        
-        return candidate.content.parts[0].text.trim();
     }
 };
