@@ -1316,6 +1316,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const total = trAnalysisMissing.length;
         let done = 0;
         let errors = 0;
+        const failedWords = [];
         
         for (const m of trAnalysisMissing) {
             try {
@@ -1324,6 +1325,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 done++;
             } catch (err) {
                 console.error('Bulk translate error for', m.word, ':', err);
+                failedWords.push({ id: m.id, word: m.word, definition: m.definition, error: err.message });
                 errors++;
                 done++;
             }
@@ -1331,10 +1333,34 @@ document.addEventListener('DOMContentLoaded', async () => {
             resultDiv.innerHTML = `<span style="color: #fbbf24;">⏳ İşleniyor: ${done}/${total} (${errors} hata)</span>`;
         }
         
-        trAnalysisMissing = [];
-        showToast(`Çeviri tamamlandı! ${done - errors} başarılı, ${errors} hata.`, 'success');
-        bulkBtn.innerHTML = '<i class="fa-solid fa-check"></i> Tamamlandı';
-        resultDiv.innerHTML = `<span style="color: var(--success);">✅ Tüm çeviriler tamamlandı! (${errors} hata)</span>`;
+        trAnalysisMissing = failedWords; // Keep only failed ones for retry
+        showToast(`Çeviri tamamlandı! ${done - errors} başarılı, ${errors} hata.`, errors > 0 ? 'warning' : 'success');
+        
+        if (failedWords.length > 0) {
+            bulkBtn.disabled = false;
+            bulkBtn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> ${failedWords.length} Hatayı Tekrar Dene`;
+            
+            const failedListHtml = failedWords.map(f => 
+                `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:rgba(248,113,113,0.1);border-radius:6px;margin-top:4px;">
+                    <span style="color:var(--text-primary);font-weight:600;">${f.word}</span>
+                    <span style="color:var(--text-muted);font-size:0.75rem;max-width:60%;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.error}">${f.error}</span>
+                </div>`
+            ).join('');
+            
+            resultDiv.innerHTML = `
+                <div style="margin-top:8px;">
+                    <span style="color:var(--success);">✅ Başarılı: <strong>${done - errors}</strong></span> &nbsp;|&nbsp;
+                    <span style="color:var(--error);">❌ Başarısız: <strong>${errors}</strong></span>
+                </div>
+                <div style="margin-top:8px;max-height:200px;overflow-y:auto;">
+                    <p style="color:var(--error);font-size:0.82rem;font-weight:600;margin-bottom:4px;">Hata Alan Kelimeler:</p>
+                    ${failedListHtml}
+                </div>`;
+        } else {
+            bulkBtn.innerHTML = '<i class="fa-solid fa-check"></i> Tamamlandı';
+            bulkBtn.disabled = true;
+            resultDiv.innerHTML = `<span style="color: var(--success);">✅ Tüm çeviriler başarıyla tamamlandı!</span>`;
+        }
     });
 
     // ─── Practice Source Selector ────────────────────────────
@@ -2029,7 +2055,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const turkishDef = await GeminiService.translateDefinition(w, meaning.definition);
                         await DB.updateMeaning(mId, { turkishDefinition: turkishDef });
                         showToast('Türkçe anlam eklendi!', 'success');
-                        showWordDetail(w);
+                        openWordDetails(w);
                     } catch (err) {
                         showToast('Çeviri başarısız: ' + err.message, 'error');
                         btnEl.disabled = false;
@@ -2044,7 +2070,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const mId = Number(e.currentTarget.dataset.meaningId);
                     await DB.updateMeaning(mId, { turkishDefinition: null });
                     showToast('Türkçe anlam silindi.', 'info');
-                    showWordDetail(currentDetailWord);
+                    openWordDetails(currentDetailWord);
                 });
             });
 
@@ -2074,7 +2100,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     }
                     showToast(`${done} anlam çevrildi!`, 'success');
-                    showWordDetail(w);
+                    openWordDetails(w);
                 });
             }
         }
@@ -2864,6 +2890,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         els.btnGoBack.style.display = goBackHistory.length > 1 ? 'inline-flex' : 'none';
         cardStartTime = Date.now();
 
+        // Reset container width (speaking mode will override to 1200px)
+        els.practiceActive.style.maxWidth = '800px';
+
         if (currentCardMode === 'warmup') {
             els.phaseQuestion.style.display = 'none';
             els.phaseResult.classList.remove('visible');
@@ -2940,40 +2969,202 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (els.phaseCombined) els.phaseCombined.style.display = 'none';
             if (els.phaseScan) els.phaseScan.style.display = 'none';
             
+            // Expand container for speaking mode
+            els.practiceActive.style.maxWidth = '1200px';
+            
             if (els.speakingWordsContainer) {
                 els.speakingWordsContainer.innerHTML = '';
-                
-                // Compact 3-column equal layout
-                els.speakingWordsContainer.style.display = 'grid';
-                els.speakingWordsContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
-                els.speakingWordsContainer.style.gap = '12px';
-                els.speakingWordsContainer.style.alignItems = 'stretch';
+                els.speakingWordsContainer.className = 'speaking-grid';
                 
                 // card is an array of up to 3 cards for speaking mode
                 card.forEach((c, index) => {
-                    // Prefer Gemini turkishDefinition, fallback to old hint meanings
-                    const trDefHtml = c.turkishDefinition
-                        ? `<div style="color: #fbbf24; font-size: 0.85rem; font-weight: 600; background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 8px; padding: 8px 10px; text-align: left;">🇹🇷 ${c.turkishDefinition}</div>`
-                        : (c.meanings.length > 0 ? `<div style="color: #fbbf24; font-size: 0.85rem; font-weight: 600; background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 8px; padding: 8px 10px; text-align: left;">🇹🇷 ${c.meanings.join(', ')}</div>` : '');
+                    const safeWord = c.word.replace(/'/g, "\\'");
+                    const meaningId = c.meaningId;
                     
+                    // TR definition section with delete/regenerate
+                    let trDefHtml = '';
+                    if (c.turkishDefinition) {
+                        trDefHtml = `<div class="speaking-tr-def" data-card-idx="${index}">
+                            <span>🇹🇷 ${c.turkishDefinition}</span>
+                            <button class="speaking-tr-del" data-card-idx="${index}" data-meaning-id="${meaningId}" title="TR çeviriyi sil">✕</button>
+                        </div>`;
+                    } else {
+                        trDefHtml = `<div class="speaking-tr-actions" data-card-idx="${index}">
+                            <button class="speaking-tr-gen" data-card-idx="${index}" data-meaning-id="${meaningId}" data-word="${safeWord}" title="Türkçe çeviri üret">
+                                <i class="fa-solid fa-language"></i> 🇹🇷 Çeviri Üret
+                            </button>
+                        </div>`;
+                    }
+                    
+                    // EN definition
                     const enDefHtml = c.englishDefinition && c.englishDefinition !== "Anlam bulunamadı"
-                        ? `<div style="color: #34d399; font-size: 0.78rem; font-weight: 500; background: rgba(52, 211, 153, 0.06); border: 1px solid rgba(52, 211, 153, 0.15); border-radius: 8px; padding: 8px 10px; text-align: left;">🇬🇧 ${c.englishDefinition}</div>`
+                        ? `<div class="speaking-en-def">🇬🇧 ${c.englishDefinition}</div>`
                         : '';
 
-                    const safeWord = c.word.replace(/'/g, "\\'");
-                    const cardHtml = '<div style="background: var(--bg-glass); border-radius: 12px; padding: 16px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; min-width: 0;">' +
-                        '<div style="display: flex; align-items: center; justify-content: center; gap: 8px;">' +
-                            '<h3 style="color: #e2e8f0; font-size: 1.3rem; font-weight: 800; text-transform: lowercase; word-break: break-word; margin: 0;">' + c.word + '</h3>' +
-                            '<button onclick="speakWord(\'' + safeWord + '\')" style="background: none; border: none; color: var(--info); cursor: pointer; font-size: 1rem; padding: 2px 4px; flex-shrink: 0;" title="Seslendir">🔊</button>' +
-                        '</div>' +
-                        trDefHtml +
-                        enDefHtml +
-                    '</div>';
+                    const cardHtml = `<div class="speaking-card" data-card-idx="${index}">
+                        <div class="speaking-card-header">
+                            <h3 class="speaking-card-word">${c.word}</h3>
+                            <button onclick="speakWord('${safeWord}')" class="speaking-audio-btn" title="Seslendir">🔊</button>
+                        </div>
+                        ${trDefHtml}
+                        ${enDefHtml}
+                        <button class="speaking-details-toggle" data-card-idx="${index}">
+                            <i class="fa-solid fa-chevron-down"></i> Detayları Göster
+                        </button>
+                        <div class="speaking-details-panel" id="speaking-details-${index}" style="display:none;">
+                            <div class="speaking-detail-sentence" id="speaking-sentence-${index}">
+                                <span class="speaking-detail-label">Cümle:</span>
+                                <span class="speaking-detail-text" id="speaking-sentence-text-${index}">Yükleniyor...</span>
+                            </div>
+                            <div class="speaking-detail-turkish" id="speaking-turkish-${index}">
+                                <span class="speaking-detail-label">Türkçe:</span>
+                                <span class="speaking-detail-text" id="speaking-turkish-text-${index}"></span>
+                            </div>
+                            <div class="speaking-detail-hint" id="speaking-hint-${index}">
+                                <span class="speaking-detail-label">İpucu:</span>
+                                <span class="speaking-detail-text" id="speaking-hint-text-${index}"></span>
+                            </div>
+                            <button class="speaking-shuffle-btn" data-card-idx="${index}" data-meaning-id="${meaningId}">
+                                <i class="fa-solid fa-shuffle"></i> Başka Cümle
+                            </button>
+                        </div>
+                    </div>`;
                     els.speakingWordsContainer.insertAdjacentHTML('beforeend', cardHtml);
                 });
+                
+                // --- Attach Speaking Card Event Handlers ---
+                
+                // Details toggle
+                els.speakingWordsContainer.querySelectorAll('.speaking-details-toggle').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const idx = btn.dataset.cardIdx;
+                        const panel = document.getElementById(`speaking-details-${idx}`);
+                        const isOpen = panel.style.display !== 'none';
+                        
+                        if (isOpen) {
+                            panel.style.display = 'none';
+                            btn.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Detayları Göster';
+                        } else {
+                            panel.style.display = 'block';
+                            btn.innerHTML = '<i class="fa-solid fa-chevron-up"></i> Detayları Gizle';
+                            
+                            // Load a random sentence for this meaning
+                            const c = card[idx];
+                            const sentences = currentSession.meaningSentences.get(c.meaningId) || [];
+                            if (sentences.length > 0) {
+                                const randSentence = sentences[Math.floor(Math.random() * sentences.length)];
+                                const parts = randSentence.sentence.split('___');
+                                const fullSentence = parts[0] + randSentence.answer + (parts[1] || '');
+                                document.getElementById(`speaking-sentence-text-${idx}`).textContent = fullSentence;
+                                document.getElementById(`speaking-turkish-text-${idx}`).textContent = randSentence.turkish || '';
+                                document.getElementById(`speaking-hint-text-${idx}`).textContent = randSentence.hint || '';
+                            } else {
+                                document.getElementById(`speaking-sentence-text-${idx}`).textContent = 'Bu anlam için cümle bulunamadı.';
+                            }
+                        }
+                    });
+                });
+                
+                // Shuffle sentence button
+                els.speakingWordsContainer.querySelectorAll('.speaking-shuffle-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const idx = btn.dataset.cardIdx;
+                        const meaningId = btn.dataset.meaningId;
+                        const sentences = currentSession.meaningSentences.get(meaningId) || [];
+                        if (sentences.length > 0) {
+                            const randSentence = sentences[Math.floor(Math.random() * sentences.length)];
+                            const parts = randSentence.sentence.split('___');
+                            const fullSentence = parts[0] + randSentence.answer + (parts[1] || '');
+                            document.getElementById(`speaking-sentence-text-${idx}`).textContent = fullSentence;
+                            document.getElementById(`speaking-turkish-text-${idx}`).textContent = randSentence.turkish || '';
+                            document.getElementById(`speaking-hint-text-${idx}`).textContent = randSentence.hint || '';
+                        }
+                    });
+                });
+                
+                // TR Delete button
+                els.speakingWordsContainer.querySelectorAll('.speaking-tr-del').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const idx = btn.dataset.cardIdx;
+                        const meaningId = Number(btn.dataset.meaningId);
+                        try {
+                            await DB.updateMeaning(meaningId, { turkishDefinition: null });
+                            showToast('TR çeviri silindi.', 'info');
+                            // Update the card data
+                            card[idx].turkishDefinition = null;
+                            // Re-render just the TR section
+                            const cardEl = els.speakingWordsContainer.querySelector(`.speaking-card[data-card-idx="${idx}"]`);
+                            const trDefEl = cardEl.querySelector('.speaking-tr-def');
+                            if (trDefEl) {
+                                const safeWord = card[idx].word.replace(/'/g, "\\'");
+                                trDefEl.outerHTML = `<div class="speaking-tr-actions" data-card-idx="${idx}">
+                                    <button class="speaking-tr-gen" data-card-idx="${idx}" data-meaning-id="${meaningId}" data-word="${safeWord}" title="Türkçe çeviri üret">
+                                        <i class="fa-solid fa-language"></i> 🇹🇷 Çeviri Üret
+                                    </button>
+                                </div>`;
+                                // Re-attach gen handler
+                                cardEl.querySelector('.speaking-tr-gen')?.addEventListener('click', handleSpeakingTrGen);
+                            }
+                        } catch (err) {
+                            showToast('Silme hatası: ' + err.message, 'error');
+                        }
+                    });
+                });
+                
+                // TR Generate button handler
+                async function handleSpeakingTrGen(e) {
+                    const btn = e.currentTarget;
+                    const idx = btn.dataset.cardIdx;
+                    const meaningId = Number(btn.dataset.meaningId);
+                    const word = btn.dataset.word;
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Üretiliyor...';
+                    try {
+                        const meanings = await DB.getMeaningsForWord(word);
+                        const meaning = meanings.find(m => m.id === meaningId);
+                        if (!meaning) throw new Error('Anlam bulunamadı');
+                        const turkishDef = await GeminiService.translateDefinition(word, meaning.definition);
+                        await DB.updateMeaning(meaningId, { turkishDefinition: turkishDef });
+                        showToast('TR çeviri üretildi!', 'success');
+                        // Update card data
+                        card[idx].turkishDefinition = turkishDef;
+                        // Re-render TR section
+                        const cardEl = els.speakingWordsContainer.querySelector(`.speaking-card[data-card-idx="${idx}"]`);
+                        const trActionsEl = cardEl.querySelector('.speaking-tr-actions');
+                        if (trActionsEl) {
+                            trActionsEl.outerHTML = `<div class="speaking-tr-def" data-card-idx="${idx}">
+                                <span>🇹🇷 ${turkishDef}</span>
+                                <button class="speaking-tr-del" data-card-idx="${idx}" data-meaning-id="${meaningId}" title="TR çeviriyi sil">✕</button>
+                            </div>`;
+                            // Re-attach delete handler
+                            cardEl.querySelector('.speaking-tr-del')?.addEventListener('click', async function() {
+                                try {
+                                    await DB.updateMeaning(meaningId, { turkishDefinition: null });
+                                    showToast('TR çeviri silindi.', 'info');
+                                    card[idx].turkishDefinition = null;
+                                    const safeWord = card[idx].word.replace(/'/g, "\\'");
+                                    this.closest('.speaking-tr-def').outerHTML = `<div class="speaking-tr-actions" data-card-idx="${idx}">
+                                        <button class="speaking-tr-gen" data-card-idx="${idx}" data-meaning-id="${meaningId}" data-word="${safeWord}" title="Türkçe çeviri üret">
+                                            <i class="fa-solid fa-language"></i> 🇹🇷 Çeviri Üret
+                                        </button>
+                                    </div>`;
+                                    cardEl.querySelector('.speaking-tr-gen')?.addEventListener('click', handleSpeakingTrGen);
+                                } catch (err) {
+                                    showToast('Silme hatası: ' + err.message, 'error');
+                                }
+                            });
+                        }
+                    } catch (err) {
+                        showToast('Çeviri hatası: ' + err.message, 'error');
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa-solid fa-language"></i> 🇹🇷 Çeviri Üret';
+                    }
+                }
+                
+                els.speakingWordsContainer.querySelectorAll('.speaking-tr-gen').forEach(btn => {
+                    btn.addEventListener('click', handleSpeakingTrGen);
+                });
             }
-
-
 
             if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'block';
             if (els.btnSpeakingNext) els.btnSpeakingNext.focus();

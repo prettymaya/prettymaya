@@ -2156,3 +2156,255 @@ option {
         margin-bottom: 28px;
     }
 }
+
+/* ═══════════════════════════════════════════════
+   Speaking Mode — Responsive Cards
+   ═══════════════════════════════════════════════ */
+
+.speaking-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    align-items: stretch;
+    margin-bottom: 32px;
+}
+
+.speaking-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    text-align: center;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    transition: border-color var(--transition-base);
+}
+
+.speaking-card:hover {
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+.speaking-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.speaking-card-word {
+    color: #e2e8f0;
+    font-size: 1.6rem;
+    font-weight: 800;
+    text-transform: lowercase;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    margin: 0;
+    line-height: 1.3;
+}
+
+.speaking-audio-btn {
+    background: none;
+    border: none;
+    color: var(--info);
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 4px 6px;
+    flex-shrink: 0;
+    transition: transform var(--transition-fast);
+}
+
+.speaking-audio-btn:hover {
+    transform: scale(1.2);
+}
+
+/* TR Definition with delete */
+.speaking-tr-def {
+    color: #fbbf24;
+    font-size: 0.88rem;
+    font-weight: 600;
+    background: rgba(251, 191, 36, 0.08);
+    border: 1px solid rgba(251, 191, 36, 0.2);
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: left;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.speaking-tr-def span {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.speaking-tr-del {
+    background: none;
+    border: none;
+    color: var(--error);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    opacity: 0.6;
+    transition: opacity var(--transition-fast);
+}
+
+.speaking-tr-del:hover {
+    opacity: 1;
+    background: rgba(248, 113, 113, 0.15);
+}
+
+/* TR Generate button */
+.speaking-tr-actions {
+    text-align: center;
+}
+
+.speaking-tr-gen {
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px dashed rgba(251, 191, 36, 0.3);
+    color: #fbbf24;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: inherit;
+    transition: all var(--transition-fast);
+    width: 100%;
+}
+
+.speaking-tr-gen:hover {
+    background: rgba(251, 191, 36, 0.18);
+    border-color: rgba(251, 191, 36, 0.5);
+}
+
+.speaking-tr-gen:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* EN Definition */
+.speaking-en-def {
+    color: #34d399;
+    font-size: 0.8rem;
+    font-weight: 500;
+    background: rgba(52, 211, 153, 0.06);
+    border: 1px solid rgba(52, 211, 153, 0.15);
+    border-radius: 8px;
+    padding: 8px 12px;
+    text-align: left;
+    line-height: 1.4;
+}
+
+/* Details toggle button */
+.speaking-details-toggle {
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    color: var(--accent-purple-light);
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 7px 12px;
+    border-radius: 8px;
+    font-family: inherit;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.speaking-details-toggle:hover {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.35);
+}
+
+/* Details panel */
+.speaking-details-panel {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: left;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: fadeIn 0.2s ease;
+}
+
+.speaking-detail-sentence,
+.speaking-detail-turkish,
+.speaking-detail-hint {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.speaking-detail-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.speaking-detail-text {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.speaking-detail-sentence .speaking-detail-text {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.speaking-detail-hint .speaking-detail-text {
+    color: #fbbf24;
+    font-weight: 600;
+}
+
+/* Shuffle button */
+.speaking-shuffle-btn {
+    background: rgba(96, 165, 250, 0.1);
+    border: 1px solid rgba(96, 165, 250, 0.2);
+    color: var(--info);
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 7px 12px;
+    border-radius: 8px;
+    font-family: inherit;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.speaking-shuffle-btn:hover {
+    background: rgba(96, 165, 250, 0.2);
+    border-color: rgba(96, 165, 250, 0.4);
+}
+
+/* ─── Speaking Mode: Mobile (1-column) ─────────── */
+@media (max-width: 768px) {
+    .speaking-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .speaking-card-word {
+        font-size: 1.4rem;
+    }
+
+    .speaking-card {
+        padding: 16px;
+    }
+}
+
