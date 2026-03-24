@@ -254,24 +254,9 @@ Example output:
         }
     },
 
-    async translateDefinition(word, englishDefinition, _retry = false) {
+    async translateDefinition(word, englishDefinition) {
         const apiKey = await this.getApiKey();
         if (!apiKey) throw new Error('API anahtarı bulunamadı');
-
-        const prompt = _retry
-            ? `Translate to Turkish (short): "${word}" means "${englishDefinition}". Write ONLY the Turkish translation.`
-            : `Sen bir İngilizce-Türkçe sözlük uzmanısın.
-
-Görev: Aşağıdaki İngilizce kelimenin belirtilen anlamını kısa, net ve doğal Türkçeye çevir.
-
-Kelime: "${word}"
-İngilizce tanım: "${englishDefinition}"
-
-KURALLAR:
-1. Çeviri kısa olmalı (1-2 cümle MAX)
-2. Doğal, günlük Türkçe kullan (ders kitabı değil, konuşma dili)
-3. Kelimenin bu anlamda nasıl kullanıldığını net şekilde aktar
-4. SADECE Türkçe çeviriyi yaz, başka hiçbir şey ekleme (açıklama, not, vs.)`;
 
         const safetySettings = [
             { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
@@ -280,35 +265,43 @@ KURALLAR:
             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
         ];
 
+        const attempts = [
+            { temp: 0.1, prompt: `Sen bir İngilizce-Türkçe sözlük uzmanısın.\n\nGörev: Aşağıdaki İngilizce kelimenin belirtilen anlamını kısa, net ve doğal Türkçeye çevir.\n\nKelime: "${word}"\nİngilizce tanım: "${englishDefinition}"\n\nKURALLAR:\n1. Çeviri kısa olmalı (1-2 cümle MAX)\n2. Doğal, günlük Türkçe kullan\n3. SADECE Türkçe çeviriyi yaz` },
+            { temp: 0.5, prompt: `Translate to Turkish (short): "${word}" means "${englishDefinition}". Write ONLY the Turkish translation.` },
+            { temp: 0.9, prompt: `"${word}" kelimesinin Türkçe anlamı nedir? Tanım: ${englishDefinition}. Sadece kısa Türkçe çeviri yaz.` },
+        ];
+
         const url = `${this.BASE_URL}/${this.MODEL}:generateContent?key=${apiKey}`;
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                safetySettings,
-                generationConfig: {
-                    temperature: 0.1,
-                    maxOutputTokens: 256,
+        let lastErr;
+
+        for (let i = 0; i < attempts.length; i++) {
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: attempts[i].prompt }] }],
+                        safetySettings,
+                        generationConfig: {
+                            temperature: attempts[i].temp,
+                            maxOutputTokens: 256,
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error?.message || 'Gemini API Hatası');
                 }
-            })
-        });
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error?.message || 'Gemini API Hatası');
-        }
-
-        try {
-            const data = await response.json();
-            return this._extractText(data).trim();
-        } catch (err) {
-            // Retry once with simplified prompt
-            if (!_retry) {
-                console.warn(`Retry for "${word}":`, err.message);
-                return this.translateDefinition(word, englishDefinition, true);
+                const data = await response.json();
+                return this._extractText(data).trim();
+            } catch (err) {
+                console.warn(`translateDefinition attempt ${i + 1}/3 failed for "${word}":`, err.message);
+                lastErr = err;
             }
-            throw err;
         }
+
+        throw lastErr;
     }
 };
