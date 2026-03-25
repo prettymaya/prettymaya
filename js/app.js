@@ -261,6 +261,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let _edgeVoiceName = localStorage.getItem('shadowingVoice') || 'en-US-AvaMultilingualNeural';
     let _currentAudio = null;
     let _currentWs = null;
+    let _edgeTTSFailed = false; // Cache: if Edge TTS fails once, don't retry
     const _voiceSelect = document.getElementById('shadowing-voice-select');
 
     // Populate dropdown
@@ -333,7 +334,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Fallback to Web Speech API if Edge TTS fails
         function fallbackSpeak() {
             if (gotAudio) return;
-            console.warn('[EdgeTTS] Fallback to Web Speech API');
+            _edgeTTSFailed = true;
+            console.warn('[EdgeTTS] Fallback → Web Speech API');
             if (!window.speechSynthesis) { if (onEnd) onEnd(); return; }
             var utter = new SpeechSynthesisUtterance(text);
             utter.lang = 'en-US';
@@ -476,12 +478,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 
+    // Web Speech API direct speak (used when Edge TTS unavailable)
+    function webSpeechSpeak(text, rate, onEnd) {
+        if (!window.speechSynthesis) { if (onEnd) onEnd(); return; }
+        speechSynthesis.cancel();
+        var utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'en-US';
+        utter.rate = rate;
+        var voices = speechSynthesis.getVoices();
+        var enVoices = voices.filter(function(v) { return v.lang.startsWith('en'); });
+        var best = enVoices.find(function(v) { return v.name.includes('Samantha'); })
+            || enVoices.find(function(v) { return v.name.includes('Daniel'); })
+            || enVoices.find(function(v) { return v.name.includes('Karen'); })
+            || enVoices.find(function(v) { return v.lang === 'en-US'; })
+            || enVoices[0] || null;
+        if (best) utter.voice = best;
+        if (onEnd) utter.onend = onEnd;
+        speechSynthesis.speak(utter);
+    }
+
     function speakSentence(text, rate, onEnd) {
         if (!text) return;
         rate = rate || 0.9;
         _cancelEdgeTTS();
         if (window.speechSynthesis) speechSynthesis.cancel();
-        edgeTTSSpeak(text, _edgeVoiceName, rate, onEnd);
+        
+        if (_edgeTTSFailed) {
+            // Edge TTS previously failed, use Web Speech API directly (no delay)
+            webSpeechSpeak(text, rate, onEnd);
+        } else {
+            edgeTTSSpeak(text, _edgeVoiceName, rate, onEnd);
+        }
     }
     window.speakSentence = speakSentence;
 
