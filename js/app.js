@@ -236,86 +236,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     window.speakWord = speakWord; // expose for inline onclick
 
-    // ─── Hybrid TTS Voice System ─────────────────────────
-    // System voices (Web Speech API - includes Siri on Safari)
-    // + Edge TTS voices (Microsoft Neural - works in Chrome/Edge)
-    const EDGE_TTS_VOICES = [
-        { name: 'en-US-AvaMultilingualNeural', label: 'Ava (Multilingual)' },
-        { name: 'en-US-AndrewMultilingualNeural', label: 'Andrew (Multilingual)' },
-        { name: 'en-US-EmmaMultilingualNeural', label: 'Emma (Multilingual)' },
-        { name: 'en-US-BrianMultilingualNeural', label: 'Brian (Multilingual)' },
-        { name: 'en-US-JennyNeural', label: 'Jenny' },
-        { name: 'en-US-GuyNeural', label: 'Guy' },
-        { name: 'en-US-AriaNeural', label: 'Aria' },
-        { name: 'en-US-DavisNeural', label: 'Davis' },
-    ];
-
-    // Voice selection state: { type: 'system'|'edge', name: '...' }
-    let _voiceChoice = JSON.parse(localStorage.getItem('shadowingVoiceChoice') || 'null') 
-        || { type: 'edge', name: 'en-US-AvaMultilingualNeural' };
-    let _currentAudio = null;
-    let _currentWs = null;
-    let _edgeTTSFailed = false;
+    // ─── TTS Voice System (Web Speech API Only) ─────────────
+    // Safari'de Siri sesi: macOS Ayarlar > Erişilebilirlik > Konuşma İçeriği
+    // Sistem Sesi = Siri olarak ayarla, ardından "Sistem Varsayılanı" seç.
+    
+    let _selectedVoiceName = localStorage.getItem('shadowingVoice') || '__default__';
     const _voiceSelect = document.getElementById('shadowing-voice-select');
 
     function populateVoiceList() {
         if (!_voiceSelect) return;
         _voiceSelect.innerHTML = '';
 
-        // 1. System voices from Web Speech API
-        var systemVoices = [];
+        // "System Default" option — Safari uses Siri if set as default in macOS
+        var defOpt = document.createElement('option');
+        defOpt.value = '__default__';
+        defOpt.textContent = '⭐ Sistem Varsayılanı (Siri)';
+        if (_selectedVoiceName === '__default__') defOpt.selected = true;
+        _voiceSelect.appendChild(defOpt);
+
+        // System voices from Web Speech API
         if (window.speechSynthesis) {
-            var allVoices = speechSynthesis.getVoices();
-            systemVoices = allVoices.filter(function(v) { return v.lang.startsWith('en'); });
-            // Log all voices for debugging
-            console.log('[TTS] Sistem sesleri (' + systemVoices.length + '):', 
-                systemVoices.map(function(v) { return v.name + ' (' + v.lang + ')'; }).join(', '));
-        }
+            var voices = speechSynthesis.getVoices();
+            var enVoices = voices.filter(function(v) { return v.lang.startsWith('en'); });
+            
+            console.log('[TTS] Kullanılabilir sesler (' + enVoices.length + '):');
+            enVoices.forEach(function(v) { console.log('  - ' + v.name + ' (' + v.lang + ')'); });
 
-        if (systemVoices.length > 0) {
-            var grp = document.createElement('optgroup');
-            grp.label = '🍎 Sistem Sesleri (Safari)';
-            systemVoices.forEach(function(voice) {
-                var opt = document.createElement('option');
-                opt.value = 'system:' + voice.name;
-                var isSiri = voice.name.toLowerCase().includes('siri');
-                opt.textContent = (isSiri ? '⭐ ' : '') + voice.name + ' (' + voice.lang + ')';
-                if (_voiceChoice.type === 'system' && _voiceChoice.name === voice.name) {
-                    opt.selected = true;
-                }
-                grp.appendChild(opt);
-            });
-            _voiceSelect.appendChild(grp);
-        }
-
-        // 2. Edge TTS voices
-        var grpEdge = document.createElement('optgroup');
-        grpEdge.label = '☁️ Edge TTS (Chrome/Edge)';
-        EDGE_TTS_VOICES.forEach(function(voice) {
-            var opt = document.createElement('option');
-            opt.value = 'edge:' + voice.name;
-            opt.textContent = voice.label;
-            if (_voiceChoice.type === 'edge' && _voiceChoice.name === voice.name) {
-                opt.selected = true;
-            }
-            grpEdge.appendChild(opt);
-        });
-        _voiceSelect.appendChild(grpEdge);
-
-        // Auto-select Siri if nothing previously saved and Siri available
-        if (!localStorage.getItem('shadowingVoiceChoice') && systemVoices.length > 0) {
-            var siri = systemVoices.find(function(v) { return v.name.toLowerCase().includes('siri'); });
-            if (siri) {
-                _voiceChoice = { type: 'system', name: siri.name };
-                // Select in dropdown
-                for (var i = 0; i < _voiceSelect.options.length; i++) {
-                    if (_voiceSelect.options[i].value === 'system:' + siri.name) {
-                        _voiceSelect.selectedIndex = i;
-                        break;
-                    }
-                }
-                localStorage.setItem('shadowingVoiceChoice', JSON.stringify(_voiceChoice));
-                console.log('[TTS] Siri sesi otomatik seçildi:', siri.name);
+            if (enVoices.length > 0) {
+                var grp = document.createElement('optgroup');
+                grp.label = 'Sistem Sesleri';
+                enVoices.forEach(function(voice) {
+                    var opt = document.createElement('option');
+                    opt.value = voice.name;
+                    opt.textContent = voice.name + ' (' + voice.lang + ')';
+                    if (_selectedVoiceName === voice.name) opt.selected = true;
+                    grp.appendChild(opt);
+                });
+                _voiceSelect.appendChild(grp);
             }
         }
     }
@@ -330,246 +287,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (_voiceSelect) {
         _voiceSelect.addEventListener('change', function() {
-            var val = _voiceSelect.value;
-            var parts = val.split(':');
-            var type = parts[0]; // 'system' or 'edge'
-            var name = parts.slice(1).join(':');
-            _voiceChoice = { type: type, name: name };
-            _edgeTTSFailed = false; // Reset Edge TTS failure on manual voice change
-            localStorage.setItem('shadowingVoiceChoice', JSON.stringify(_voiceChoice));
+            _selectedVoiceName = _voiceSelect.value;
+            localStorage.setItem('shadowingVoice', _selectedVoiceName);
             speakSentence('Hello, this is my voice.');
         });
     }
 
-    // Edge TTS via WebSocket
-    function _uuid() {
-        return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            var r = Math.random() * 16 | 0;
-            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-        });
-    }
-
-    function _escapeXml(str) {
-        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    function _cancelEdgeTTS() {
-        if (_currentAudio) {
-            _currentAudio.pause();
-            _currentAudio.src = '';
-            _currentAudio = null;
-        }
-        if (_currentWs) {
-            try { _currentWs.close(); } catch(e) {}
-            _currentWs = null;
-        }
-    }
-
-    function edgeTTSSpeak(text, voiceName, rate, onEnd) {
-        _cancelEdgeTTS();
-
-        var connId = _uuid();
-        var requestId = _uuid();
-        var wsUrl = 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4&ConnectionId=' + connId;
-
-        var audioChunks = [];
-        var ws;
-        var gotAudio = false;
-        var fallbackTimer = null;
-
-        // Fallback to Web Speech API if Edge TTS fails
-        function fallbackSpeak() {
-            if (gotAudio) return;
-            _edgeTTSFailed = true;
-            console.warn('[EdgeTTS] Fallback → Web Speech API');
-            if (!window.speechSynthesis) { if (onEnd) onEnd(); return; }
-            var utter = new SpeechSynthesisUtterance(text);
-            utter.lang = 'en-US';
-            utter.rate = rate;
-            // Pick best available Web Speech voice
-            var voices = speechSynthesis.getVoices();
-            var enVoices = voices.filter(function(v) { return v.lang.startsWith('en'); });
-            var best = enVoices.find(function(v) { return v.name.includes('Samantha'); })
-                || enVoices.find(function(v) { return v.name.includes('Daniel'); })
-                || enVoices.find(function(v) { return v.name.includes('Karen'); })
-                || enVoices.find(function(v) { return v.lang === 'en-US'; })
-                || enVoices[0] || null;
-            if (best) utter.voice = best;
-            if (onEnd) utter.onend = onEnd;
-            speechSynthesis.speak(utter);
-        }
-
-        try {
-            ws = new WebSocket(wsUrl);
-            ws.binaryType = 'arraybuffer'; // Safari compat: receive ArrayBuffer directly
-        } catch(e) {
-            console.error('[EdgeTTS] WebSocket create failed:', e);
-            fallbackSpeak();
-            return;
-        }
-
-        _currentWs = ws;
-
-        // Timeout: if no audio in 5 seconds, fallback
-        fallbackTimer = setTimeout(function() {
-            if (!gotAudio) {
-                console.warn('[EdgeTTS] Timeout, falling back');
-                try { ws.close(); } catch(e) {}
-                _currentWs = null;
-                fallbackSpeak();
-            }
-        }, 5000);
-
-        ws.onopen = function() {
-            console.log('[EdgeTTS] Connected, sending SSML...');
-            // Config message
-            var configMsg = 'Content-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n' +
-                JSON.stringify({
-                    context: {
-                        synthesis: {
-                            audio: {
-                                metadataoptions: { sentenceBoundaryEnabled: 'false', wordBoundaryEnabled: 'false' },
-                                outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
-                            }
-                        }
-                    }
-                });
-            ws.send(configMsg);
-
-            // SSML
-            var ratePercent = Math.round((rate - 1) * 100);
-            var rateStr = (ratePercent >= 0 ? '+' : '') + ratePercent + '%';
-
-            var ssml = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='" + voiceName.substring(0, 5) + "'>" +
-                "<voice name='" + voiceName + "'>" +
-                "<prosody rate='" + rateStr + "' pitch='+0Hz'>" + _escapeXml(text) + "</prosody>" +
-                "</voice></speak>";
-
-            var ssmlMsg = 'X-RequestId:' + requestId + '\r\nContent-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n' + ssml;
-            ws.send(ssmlMsg);
-        };
-
-        ws.onmessage = function(event) {
-            if (event.data instanceof ArrayBuffer) {
-                // Binary audio data (ArrayBuffer mode)
-                var buf = event.data;
-                var view = new Uint8Array(buf);
-                // Edge TTS binary: first 2 bytes = header length (big-endian)
-                if (view.length > 2) {
-                    var headerLen = (view[0] << 8) | view[1];
-                    var audioStart = 2 + headerLen;
-                    if (audioStart < buf.byteLength) {
-                        audioChunks.push(buf.slice(audioStart));
-                    }
-                }
-            } else if (event.data instanceof Blob) {
-                // Blob mode fallback
-                var reader = new FileReader();
-                reader.onload = function() {
-                    var buf = reader.result;
-                    var view = new Uint8Array(buf);
-                    if (view.length > 2) {
-                        var headerLen = (view[0] << 8) | view[1];
-                        var audioStart = 2 + headerLen;
-                        if (audioStart < buf.byteLength) {
-                            audioChunks.push(buf.slice(audioStart));
-                        }
-                    }
-                };
-                reader.readAsArrayBuffer(event.data);
-            } else if (typeof event.data === 'string') {
-                if (event.data.includes('Path:turn.end')) {
-                    gotAudio = true;
-                    if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
-                    ws.close();
-                    _currentWs = null;
-                    console.log('[EdgeTTS] Received ' + audioChunks.length + ' audio chunks');
-                    // Play collected audio
-                    if (audioChunks.length > 0) {
-                        var blob = new Blob(audioChunks, { type: 'audio/mpeg' });
-                        var url = URL.createObjectURL(blob);
-                        var audio = new Audio(url);
-                        _currentAudio = audio;
-                        audio.onended = function() {
-                            URL.revokeObjectURL(url);
-                            _currentAudio = null;
-                            if (onEnd) onEnd();
-                        };
-                        audio.onerror = function() {
-                            console.error('[EdgeTTS] Audio play error');
-                            URL.revokeObjectURL(url);
-                            _currentAudio = null;
-                            fallbackSpeak();
-                        };
-                        audio.play().catch(function(e) {
-                            console.error('[EdgeTTS] Play failed:', e);
-                            fallbackSpeak();
-                        });
-                    } else {
-                        fallbackSpeak();
-                    }
-                }
-            }
-        };
-
-        ws.onerror = function(err) {
-            console.error('[EdgeTTS] WebSocket error:', err);
-            _currentWs = null;
-            if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
-            if (!gotAudio) fallbackSpeak();
-        };
-
-        ws.onclose = function() {
-            _currentWs = null;
-        };
-    }
-
-    // Web Speech API speak with specific voice name
-    function webSpeechSpeak(text, rate, onEnd, voiceName) {
-        if (!window.speechSynthesis) { if (onEnd) onEnd(); return; }
+    function speakSentence(text, rate, onEnd) {
+        if (!text || !window.speechSynthesis) { if (onEnd) onEnd(); return; }
+        rate = rate || 0.9;
         speechSynthesis.cancel();
+        
         var utter = new SpeechSynthesisUtterance(text);
         utter.lang = 'en-US';
         utter.rate = rate;
-        var voices = speechSynthesis.getVoices();
-        var targetVoice = null;
-
-        if (voiceName) {
-            // Try exact match first, then partial match
-            targetVoice = voices.find(function(v) { return v.name === voiceName; })
-                || voices.find(function(v) { return v.name.includes(voiceName); });
+        
+        // If specific voice selected (not default), set it explicitly
+        if (_selectedVoiceName !== '__default__') {
+            var voices = speechSynthesis.getVoices();
+            var target = voices.find(function(v) { return v.name === _selectedVoiceName; });
+            if (target) utter.voice = target;
         }
-        if (!targetVoice) {
-            // Fallback to best English voice
-            var enVoices = voices.filter(function(v) { return v.lang.startsWith('en'); });
-            targetVoice = enVoices.find(function(v) { return v.name.toLowerCase().includes('siri'); })
-                || enVoices.find(function(v) { return v.name.includes('Samantha'); })
-                || enVoices[0] || null;
-        }
-        if (targetVoice) {
-            utter.voice = targetVoice;
-            console.log('[TTS] Web Speech:', targetVoice.name);
-        }
+        // __default__ = don't set voice = Safari uses macOS system default (Siri if configured)
+        
         if (onEnd) utter.onend = onEnd;
         speechSynthesis.speak(utter);
-    }
-
-    function speakSentence(text, rate, onEnd) {
-        if (!text) return;
-        rate = rate || 0.9;
-        _cancelEdgeTTS();
-        if (window.speechSynthesis) speechSynthesis.cancel();
-        
-        if (_voiceChoice.type === 'system') {
-            // Use Web Speech API with the selected system voice (Siri, Samantha, etc.)
-            webSpeechSpeak(text, rate, onEnd, _voiceChoice.name);
-        } else if (_edgeTTSFailed) {
-            // Edge TTS previously failed, use Web Speech API
-            webSpeechSpeak(text, rate, onEnd);
-        } else {
-            // Try Edge TTS
-            edgeTTSSpeak(text, _voiceChoice.name, rate, onEnd);
-        }
     }
     window.speakSentence = speakSentence;
 
@@ -3712,7 +3454,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Clear timer & TTS
             if (shadowingTimerHandle) { clearTimeout(shadowingTimerHandle); shadowingTimerHandle = null; }
-            _cancelEdgeTTS();
             if (window.speechSynthesis) speechSynthesis.cancel();
 
             // card is an array of items (grouped)
@@ -3826,7 +3567,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Next button
             els.btnShadowingNext.onclick = function() {
                 if (shadowingTimerHandle) { clearTimeout(shadowingTimerHandle); shadowingTimerHandle = null; }
-                _cancelEdgeTTS();
                 if (window.speechSynthesis) speechSynthesis.cancel();
                 loadNextCard();
             };
@@ -4509,7 +4249,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         clearSavedSession();
         // Clear shadowing timer & TTS
         if (shadowingTimerHandle) { clearTimeout(shadowingTimerHandle); shadowingTimerHandle = null; }
-        _cancelEdgeTTS();
         if (window.speechSynthesis) speechSynthesis.cancel();
         els.practiceActive.style.display = 'none';
         els.practiceComplete.style.display = 'block';
