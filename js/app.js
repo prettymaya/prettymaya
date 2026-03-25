@@ -236,61 +236,107 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     window.speakWord = speakWord; // expose for inline onclick
 
-    // ─── Edge TTS Voice System (Microsoft Neural Voices) ─────
+    // ─── Hybrid TTS Voice System ─────────────────────────
+    // System voices (Web Speech API - includes Siri on Safari)
+    // + Edge TTS voices (Microsoft Neural - works in Chrome/Edge)
     const EDGE_TTS_VOICES = [
-        { name: 'en-US-AvaMultilingualNeural', label: '⭐ Ava (Multilingual)', lang: 'en-US', gender: 'Female' },
-        { name: 'en-US-AndrewMultilingualNeural', label: '⭐ Andrew (Multilingual)', lang: 'en-US', gender: 'Male' },
-        { name: 'en-US-EmmaMultilingualNeural', label: '⭐ Emma (Multilingual)', lang: 'en-US', gender: 'Female' },
-        { name: 'en-US-BrianMultilingualNeural', label: '⭐ Brian (Multilingual)', lang: 'en-US', gender: 'Male' },
-        { name: 'en-US-JennyNeural', label: 'Jenny', lang: 'en-US', gender: 'Female' },
-        { name: 'en-US-GuyNeural', label: 'Guy', lang: 'en-US', gender: 'Male' },
-        { name: 'en-US-AriaNeural', label: 'Aria', lang: 'en-US', gender: 'Female' },
-        { name: 'en-US-DavisNeural', label: 'Davis', lang: 'en-US', gender: 'Male' },
-        { name: 'en-US-JaneNeural', label: 'Jane', lang: 'en-US', gender: 'Female' },
-        { name: 'en-US-JasonNeural', label: 'Jason', lang: 'en-US', gender: 'Male' },
-        { name: 'en-US-SaraNeural', label: 'Sara', lang: 'en-US', gender: 'Female' },
-        { name: 'en-US-TonyNeural', label: 'Tony', lang: 'en-US', gender: 'Male' },
-        { name: 'en-US-NancyNeural', label: 'Nancy', lang: 'en-US', gender: 'Female' },
-        { name: 'en-US-AmberNeural', label: 'Amber', lang: 'en-US', gender: 'Female' },
-        { name: 'en-GB-SoniaNeural', label: 'Sonia (UK)', lang: 'en-GB', gender: 'Female' },
-        { name: 'en-GB-RyanNeural', label: 'Ryan (UK)', lang: 'en-GB', gender: 'Male' },
-        { name: 'en-AU-NatashaNeural', label: 'Natasha (AU)', lang: 'en-AU', gender: 'Female' },
-        { name: 'en-AU-WilliamNeural', label: 'William (AU)', lang: 'en-AU', gender: 'Male' },
+        { name: 'en-US-AvaMultilingualNeural', label: 'Ava (Multilingual)' },
+        { name: 'en-US-AndrewMultilingualNeural', label: 'Andrew (Multilingual)' },
+        { name: 'en-US-EmmaMultilingualNeural', label: 'Emma (Multilingual)' },
+        { name: 'en-US-BrianMultilingualNeural', label: 'Brian (Multilingual)' },
+        { name: 'en-US-JennyNeural', label: 'Jenny' },
+        { name: 'en-US-GuyNeural', label: 'Guy' },
+        { name: 'en-US-AriaNeural', label: 'Aria' },
+        { name: 'en-US-DavisNeural', label: 'Davis' },
     ];
 
-    let _edgeVoiceName = localStorage.getItem('shadowingVoice') || 'en-US-AvaMultilingualNeural';
+    // Voice selection state: { type: 'system'|'edge', name: '...' }
+    let _voiceChoice = JSON.parse(localStorage.getItem('shadowingVoiceChoice') || 'null') 
+        || { type: 'edge', name: 'en-US-AvaMultilingualNeural' };
     let _currentAudio = null;
     let _currentWs = null;
-    let _edgeTTSFailed = false; // Cache: if Edge TTS fails once, don't retry
+    let _edgeTTSFailed = false;
     const _voiceSelect = document.getElementById('shadowing-voice-select');
 
-    // Populate dropdown
     function populateVoiceList() {
         if (!_voiceSelect) return;
         _voiceSelect.innerHTML = '';
 
-        const females = EDGE_TTS_VOICES.filter(v => v.gender === 'Female');
-        const males = EDGE_TTS_VOICES.filter(v => v.gender === 'Male');
+        // 1. System voices from Web Speech API
+        var systemVoices = [];
+        if (window.speechSynthesis) {
+            var allVoices = speechSynthesis.getVoices();
+            systemVoices = allVoices.filter(function(v) { return v.lang.startsWith('en'); });
+            // Log all voices for debugging
+            console.log('[TTS] Sistem sesleri (' + systemVoices.length + '):', 
+                systemVoices.map(function(v) { return v.name + ' (' + v.lang + ')'; }).join(', '));
+        }
 
-        [{ label: '👩 Kadın Sesler', list: females }, { label: '👨 Erkek Sesler', list: males }].forEach(group => {
-            const grp = document.createElement('optgroup');
-            grp.label = group.label;
-            group.list.forEach(voice => {
-                const opt = document.createElement('option');
-                opt.value = voice.name;
-                opt.textContent = voice.label + ' (' + voice.lang + ')';
-                if (voice.name === _edgeVoiceName) opt.selected = true;
+        if (systemVoices.length > 0) {
+            var grp = document.createElement('optgroup');
+            grp.label = '🍎 Sistem Sesleri (Safari)';
+            systemVoices.forEach(function(voice) {
+                var opt = document.createElement('option');
+                opt.value = 'system:' + voice.name;
+                var isSiri = voice.name.toLowerCase().includes('siri');
+                opt.textContent = (isSiri ? '⭐ ' : '') + voice.name + ' (' + voice.lang + ')';
+                if (_voiceChoice.type === 'system' && _voiceChoice.name === voice.name) {
+                    opt.selected = true;
+                }
                 grp.appendChild(opt);
             });
             _voiceSelect.appendChild(grp);
+        }
+
+        // 2. Edge TTS voices
+        var grpEdge = document.createElement('optgroup');
+        grpEdge.label = '☁️ Edge TTS (Chrome/Edge)';
+        EDGE_TTS_VOICES.forEach(function(voice) {
+            var opt = document.createElement('option');
+            opt.value = 'edge:' + voice.name;
+            opt.textContent = voice.label;
+            if (_voiceChoice.type === 'edge' && _voiceChoice.name === voice.name) {
+                opt.selected = true;
+            }
+            grpEdge.appendChild(opt);
         });
+        _voiceSelect.appendChild(grpEdge);
+
+        // Auto-select Siri if nothing previously saved and Siri available
+        if (!localStorage.getItem('shadowingVoiceChoice') && systemVoices.length > 0) {
+            var siri = systemVoices.find(function(v) { return v.name.toLowerCase().includes('siri'); });
+            if (siri) {
+                _voiceChoice = { type: 'system', name: siri.name };
+                // Select in dropdown
+                for (var i = 0; i < _voiceSelect.options.length; i++) {
+                    if (_voiceSelect.options[i].value === 'system:' + siri.name) {
+                        _voiceSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+                localStorage.setItem('shadowingVoiceChoice', JSON.stringify(_voiceChoice));
+                console.log('[TTS] Siri sesi otomatik seçildi:', siri.name);
+            }
+        }
     }
-    populateVoiceList();
+
+    if (window.speechSynthesis) {
+        speechSynthesis.getVoices();
+        speechSynthesis.addEventListener('voiceschanged', populateVoiceList);
+        setTimeout(populateVoiceList, 200);
+    } else {
+        populateVoiceList();
+    }
 
     if (_voiceSelect) {
         _voiceSelect.addEventListener('change', function() {
-            _edgeVoiceName = _voiceSelect.value;
-            localStorage.setItem('shadowingVoice', _edgeVoiceName);
+            var val = _voiceSelect.value;
+            var parts = val.split(':');
+            var type = parts[0]; // 'system' or 'edge'
+            var name = parts.slice(1).join(':');
+            _voiceChoice = { type: type, name: name };
+            _edgeTTSFailed = false; // Reset Edge TTS failure on manual voice change
+            localStorage.setItem('shadowingVoiceChoice', JSON.stringify(_voiceChoice));
             speakSentence('Hello, this is my voice.');
         });
     }
@@ -478,21 +524,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 
-    // Web Speech API direct speak (used when Edge TTS unavailable)
-    function webSpeechSpeak(text, rate, onEnd) {
+    // Web Speech API speak with specific voice name
+    function webSpeechSpeak(text, rate, onEnd, voiceName) {
         if (!window.speechSynthesis) { if (onEnd) onEnd(); return; }
         speechSynthesis.cancel();
         var utter = new SpeechSynthesisUtterance(text);
         utter.lang = 'en-US';
         utter.rate = rate;
         var voices = speechSynthesis.getVoices();
-        var enVoices = voices.filter(function(v) { return v.lang.startsWith('en'); });
-        var best = enVoices.find(function(v) { return v.name.includes('Samantha'); })
-            || enVoices.find(function(v) { return v.name.includes('Daniel'); })
-            || enVoices.find(function(v) { return v.name.includes('Karen'); })
-            || enVoices.find(function(v) { return v.lang === 'en-US'; })
-            || enVoices[0] || null;
-        if (best) utter.voice = best;
+        var targetVoice = null;
+
+        if (voiceName) {
+            // Try exact match first, then partial match
+            targetVoice = voices.find(function(v) { return v.name === voiceName; })
+                || voices.find(function(v) { return v.name.includes(voiceName); });
+        }
+        if (!targetVoice) {
+            // Fallback to best English voice
+            var enVoices = voices.filter(function(v) { return v.lang.startsWith('en'); });
+            targetVoice = enVoices.find(function(v) { return v.name.toLowerCase().includes('siri'); })
+                || enVoices.find(function(v) { return v.name.includes('Samantha'); })
+                || enVoices[0] || null;
+        }
+        if (targetVoice) {
+            utter.voice = targetVoice;
+            console.log('[TTS] Web Speech:', targetVoice.name);
+        }
         if (onEnd) utter.onend = onEnd;
         speechSynthesis.speak(utter);
     }
@@ -503,11 +560,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         _cancelEdgeTTS();
         if (window.speechSynthesis) speechSynthesis.cancel();
         
-        if (_edgeTTSFailed) {
-            // Edge TTS previously failed, use Web Speech API directly (no delay)
+        if (_voiceChoice.type === 'system') {
+            // Use Web Speech API with the selected system voice (Siri, Samantha, etc.)
+            webSpeechSpeak(text, rate, onEnd, _voiceChoice.name);
+        } else if (_edgeTTSFailed) {
+            // Edge TTS previously failed, use Web Speech API
             webSpeechSpeak(text, rate, onEnd);
         } else {
-            edgeTTSSpeak(text, _edgeVoiceName, rate, onEnd);
+            // Try Edge TTS
+            edgeTTSSpeak(text, _voiceChoice.name, rate, onEnd);
         }
     }
     window.speakSentence = speakSentence;
