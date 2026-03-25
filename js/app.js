@@ -243,14 +243,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const PIPER_VOICES = [
         { id: 'en_US-hfc_female-medium', label: '⭐ HFC Female (Doğal)' },
-        { id: 'en_US-amy-medium', label: 'Amy (Medium)' },
-        { id: 'en_US-amy-low', label: 'Amy (Light)' },
-        { id: 'en_US-kristin-medium', label: 'Kristin' },
-        { id: 'en_US-ljspeech-medium', label: 'LJSpeech (Medium)' },
-        { id: 'en_US-ljspeech-high', label: 'LJSpeech (High)' },
-        { id: 'en_US-lessac-medium', label: 'Lessac (Medium)' },
-        { id: 'en_US-lessac-high', label: 'Lessac (High)' },
-        { id: 'en_US-kathleen-low', label: 'Kathleen' },
+        { id: 'en_US-amy-medium', label: 'Amy' },
     ];
 
     let _selectedVoiceId = localStorage.getItem('shadowingVoice') || 'en_US-hfc_female-medium';
@@ -281,6 +274,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             _selectedVoiceId = _voiceSelect.value;
             localStorage.setItem('shadowingVoice', _selectedVoiceId);
             speakSentence('Hello, this is my voice.');
+        });
+    }
+
+    // Speed control
+    let _ttsSpeed = parseFloat(localStorage.getItem('shadowingSpeed') || '1.2');
+    var _speedSlider = document.getElementById('shadowing-speed');
+    var _speedLabel = document.getElementById('shadowing-speed-label');
+    if (_speedSlider) {
+        _speedSlider.value = _ttsSpeed;
+        if (_speedLabel) _speedLabel.textContent = _ttsSpeed.toFixed(1) + 'x';
+        _speedSlider.addEventListener('input', function() {
+            _ttsSpeed = parseFloat(_speedSlider.value);
+            localStorage.setItem('shadowingSpeed', _ttsSpeed);
+            if (_speedLabel) _speedLabel.textContent = _ttsSpeed.toFixed(1) + 'x';
         });
     }
 
@@ -322,7 +329,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function speakSentence(text, rate, onEnd) {
         if (!text) { if (onEnd) onEnd(); return; }
-        rate = rate || 0.9;
+        rate = _ttsSpeed || 1.2;
         _cancelTTS();
         _piperSpeak(text, rate, onEnd);
     }
@@ -358,6 +365,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             var url = URL.createObjectURL(wav);
             var audio = new Audio(url);
             audio.playbackRate = rate;
+            console.log('[Piper] Hız:', rate + 'x');
             _currentAudio = audio;
             audio.onended = function() { URL.revokeObjectURL(url); _currentAudio = null; if (onEnd) onEnd(); };
             audio.onerror = function() { URL.revokeObjectURL(url); _currentAudio = null; if (onEnd) onEnd(); };
