@@ -236,108 +236,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     window.speakWord = speakWord; // expose for inline onclick
 
-    // ─── TTS Voice System (Local Server + Web Speech Fallback) ─────
-    // When running on localhost (python3 tts_server.py), uses Siri/Premium voices
-    // On GitHub Pages, falls back to Web Speech API automatically
+    // ─── TTS Voice System (Piper TTS — Browser WASM) ─────────────
+    // Neural TTS running entirely in browser via WebAssembly (ONNX Runtime)
+    // Models cached in Origin Private File System after first download
+    // No server needed — works on GitHub Pages!
     
-    const _isLocalServer = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-    const TTS_SERVER = ''; // Relative URLs when on local server
-    let _selectedVoiceId = localStorage.getItem('shadowingVoice') || 'com.apple.ttsbundle.siri_nicky_en-US_compact';
-    let _ttsServerAvailable = false;
+    const PIPER_VOICES = [
+        { id: 'en_US-hfc_female-medium', label: '⭐ HFC Female (Doğal)' },
+        { id: 'en_US-amy-medium', label: 'Amy (Medium)' },
+        { id: 'en_US-amy-low', label: 'Amy (Light)' },
+        { id: 'en_US-kristin-medium', label: 'Kristin' },
+        { id: 'en_US-ljspeech-medium', label: 'LJSpeech (Medium)' },
+        { id: 'en_US-ljspeech-high', label: 'LJSpeech (High)' },
+        { id: 'en_US-kathleen-low', label: 'Kathleen' },
+    ];
+
+    let _selectedVoiceId = localStorage.getItem('shadowingVoice') || 'en_US-hfc_female-medium';
     let _currentAudio = null;
+    let _piperTTS = null;
+    let _piperLoading = false;
     const _voiceSelect = document.getElementById('shadowing-voice-select');
 
-    // Check if TTS server is running
-    function checkTTSServer() {
-        if (!_isLocalServer) {
-            console.log('[TTS] GitHub Pages — Web Speech API kullanılacak');
-            populateVoiceListFallback();
-            return;
-        }
-        fetch('/voices', { signal: AbortSignal.timeout(2000) })
-            .then(function(res) { return res.json(); })
-            .then(function(voices) {
-                _ttsServerAvailable = true;
-                console.log('[TTS] ✅ Lokal TTS sunucusu aktif, ' + voices.length + ' ses');
-                populateVoiceListFromServer(voices);
-            })
-            .catch(function() {
-                _ttsServerAvailable = false;
-                console.warn('[TTS] ⚠️ Lokal TTS sunucusu çalışmıyor. Web Speech API kullanılacak.');
-                console.warn('[TTS] Sunucuyu başlat: python3 tts_server.py');
-                populateVoiceListFallback();
-            });
-    }
-
-    function populateVoiceListFromServer(voices) {
+    // Populate voice dropdown
+    (function populateVoiceList() {
         if (!_voiceSelect) return;
         _voiceSelect.innerHTML = '';
-
-        var siriVoices = voices.filter(function(v) { return v.id.includes('siri'); });
-        var otherVoices = voices.filter(function(v) { return !v.id.includes('siri'); });
-
-        if (siriVoices.length > 0) {
-            var grp = document.createElement('optgroup');
-            grp.label = '⭐ Siri Sesleri';
-            siriVoices.forEach(function(v) {
-                var opt = document.createElement('option');
-                opt.value = v.id;
-                opt.textContent = '⭐ ' + v.name + ' (' + v.lang + ')';
-                if (v.id === _selectedVoiceId) opt.selected = true;
-                grp.appendChild(opt);
-            });
-            _voiceSelect.appendChild(grp);
-        }
-
-        if (otherVoices.length > 0) {
-            var grp2 = document.createElement('optgroup');
-            grp2.label = 'Diğer Sesler';
-            otherVoices.forEach(function(v) {
-                var opt = document.createElement('option');
-                opt.value = v.id;
-                opt.textContent = v.name + ' (' + v.lang + ') [' + v.quality + ']';
-                if (v.id === _selectedVoiceId) opt.selected = true;
-                grp2.appendChild(opt);
-            });
-            _voiceSelect.appendChild(grp2);
-        }
-    }
-
-    function populateVoiceListFallback() {
-        if (!_voiceSelect) return;
-        _voiceSelect.innerHTML = '';
-        
-        var opt0 = document.createElement('option');
-        opt0.value = '__default__';
-        opt0.textContent = '⚠️ TTS sunucusu kapalı — Web Speech API';
-        opt0.selected = true;
-        _voiceSelect.appendChild(opt0);
-
-        if (window.speechSynthesis) {
-            var voices = speechSynthesis.getVoices();
-            var enVoices = voices.filter(function(v) { return v.lang.startsWith('en'); });
-            if (enVoices.length > 0) {
-                var grp = document.createElement('optgroup');
-                grp.label = 'Sistem Sesleri';
-                enVoices.forEach(function(v) {
-                    var opt = document.createElement('option');
-                    opt.value = 'webspeech:' + v.name;
-                    opt.textContent = v.name + ' (' + v.lang + ')';
-                    grp.appendChild(opt);
-                });
-                _voiceSelect.appendChild(grp);
-            }
-        }
-    }
-
-    // Init
-    checkTTSServer();
-    if (window.speechSynthesis) {
-        speechSynthesis.getVoices();
-        speechSynthesis.addEventListener('voiceschanged', function() {
-            if (!_ttsServerAvailable) populateVoiceListFallback();
+        var grp = document.createElement('optgroup');
+        grp.label = '🎤 Neural Sesler (US Kadın)';
+        PIPER_VOICES.forEach(function(v) {
+            var opt = document.createElement('option');
+            opt.value = v.id;
+            opt.textContent = v.label;
+            if (v.id === _selectedVoiceId) opt.selected = true;
+            grp.appendChild(opt);
         });
-    }
+        _voiceSelect.appendChild(grp);
+    })();
 
     if (_voiceSelect) {
         _voiceSelect.addEventListener('change', function() {
@@ -345,6 +279,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             localStorage.setItem('shadowingVoice', _selectedVoiceId);
             speakSentence('Hello, this is my voice.');
         });
+    }
+
+    // Load Piper TTS module dynamically from CDN
+    async function loadPiperTTS() {
+        if (_piperTTS) return _piperTTS;
+        if (_piperLoading) {
+            while (_piperLoading && !_piperTTS) {
+                await new Promise(function(r) { setTimeout(r, 100); });
+            }
+            return _piperTTS;
+        }
+        _piperLoading = true;
+        var cdns = [
+            'https://esm.sh/@nicholasgasior/piper-tts-web@1.0.2',
+            'https://esm.sh/@mintplex-labs/piper-tts-web@1.0.5',
+        ];
+        for (var i = 0; i < cdns.length; i++) {
+            try {
+                console.log('[Piper] Yükleniyor: ' + cdns[i]);
+                _piperTTS = await import(cdns[i]);
+                console.log('[Piper] ✅ Modül yüklendi');
+                return _piperTTS;
+            } catch(e) { console.warn('[Piper] CDN ' + i + ' başarısız:', e); }
+        }
+        _piperLoading = false;
+        return null;
     }
 
     function _cancelTTS() {
@@ -358,28 +318,40 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function speakSentence(text, rate, onEnd) {
         if (!text) { if (onEnd) onEnd(); return; }
-        rate = rate || 0.5;
+        rate = rate || 0.9;
         _cancelTTS();
-        
-        // If TTS server available and not a webspeech voice, use server
-        if (_ttsServerAvailable && !_selectedVoiceId.startsWith('webspeech:') && _selectedVoiceId !== '__default__') {
-            var url = '/speak?text=' + encodeURIComponent(text) + 
-                      '&voice=' + encodeURIComponent(_selectedVoiceId) + 
-                      '&rate=' + rate;
-            
+        _piperSpeak(text, rate, onEnd);
+    }
+
+    async function _piperSpeak(text, rate, onEnd) {
+        try {
+            var tts = await loadPiperTTS();
+            if (!tts) { _webSpeechFallback(text, rate, onEnd); return; }
+
+            var selectedOpt = _voiceSelect ? _voiceSelect.selectedOptions[0] : null;
+            var originalLabel = selectedOpt ? selectedOpt.textContent : '';
+
+            var wav = await tts.predict(
+                { text: text, voiceId: _selectedVoiceId },
+                function(progress) {
+                    if (progress && progress.total && selectedOpt) {
+                        var pct = Math.round((progress.loaded || 0) * 100 / progress.total);
+                        selectedOpt.textContent = '⬇️ İndiriliyor... ' + pct + '%';
+                    }
+                }
+            );
+
+            if (selectedOpt) selectedOpt.textContent = originalLabel;
+
+            var url = URL.createObjectURL(wav);
             var audio = new Audio(url);
+            audio.playbackRate = rate;
             _currentAudio = audio;
-            audio.onended = function() { _currentAudio = null; if (onEnd) onEnd(); };
-            audio.onerror = function() { 
-                console.error('[TTS] Server audio error, falling back');
-                _currentAudio = null;
-                _webSpeechFallback(text, rate, onEnd); 
-            };
-            audio.play().catch(function(e) {
-                console.error('[TTS] Play failed:', e);
-                _webSpeechFallback(text, rate, onEnd);
-            });
-        } else {
+            audio.onended = function() { URL.revokeObjectURL(url); _currentAudio = null; if (onEnd) onEnd(); };
+            audio.onerror = function() { URL.revokeObjectURL(url); _currentAudio = null; if (onEnd) onEnd(); };
+            await audio.play();
+        } catch(e) {
+            console.error('[Piper] Hata:', e);
             _webSpeechFallback(text, rate, onEnd);
         }
     }
@@ -390,18 +362,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         var utter = new SpeechSynthesisUtterance(text);
         utter.lang = 'en-US';
         utter.rate = rate;
-        
-        var voiceName = _selectedVoiceId.replace('webspeech:', '');
-        if (voiceName && voiceName !== '__default__') {
-            var voices = speechSynthesis.getVoices();
-            var target = voices.find(function(v) { return v.name === voiceName; });
-            if (target) utter.voice = target;
-        }
         if (onEnd) utter.onend = onEnd;
         speechSynthesis.speak(utter);
     }
 
     window.speakSentence = speakSentence;
+
+
+
 
     // Shadowing mode state
     let shadowingAutoSpeak = true;
