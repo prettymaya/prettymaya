@@ -236,107 +236,211 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     window.speakWord = speakWord; // expose for inline onclick
 
-    // ─── Shadowing TTS Voice System ─────────────────────────
-    let _selectedVoice = null;
+    // ─── Edge TTS Voice System (Microsoft Neural Voices) ─────
+    const EDGE_TTS_VOICES = [
+        { name: 'en-US-AvaMultilingualNeural', label: '⭐ Ava (Multilingual)', lang: 'en-US', gender: 'Female' },
+        { name: 'en-US-AndrewMultilingualNeural', label: '⭐ Andrew (Multilingual)', lang: 'en-US', gender: 'Male' },
+        { name: 'en-US-EmmaMultilingualNeural', label: '⭐ Emma (Multilingual)', lang: 'en-US', gender: 'Female' },
+        { name: 'en-US-BrianMultilingualNeural', label: '⭐ Brian (Multilingual)', lang: 'en-US', gender: 'Male' },
+        { name: 'en-US-JennyNeural', label: 'Jenny', lang: 'en-US', gender: 'Female' },
+        { name: 'en-US-GuyNeural', label: 'Guy', lang: 'en-US', gender: 'Male' },
+        { name: 'en-US-AriaNeural', label: 'Aria', lang: 'en-US', gender: 'Female' },
+        { name: 'en-US-DavisNeural', label: 'Davis', lang: 'en-US', gender: 'Male' },
+        { name: 'en-US-JaneNeural', label: 'Jane', lang: 'en-US', gender: 'Female' },
+        { name: 'en-US-JasonNeural', label: 'Jason', lang: 'en-US', gender: 'Male' },
+        { name: 'en-US-SaraNeural', label: 'Sara', lang: 'en-US', gender: 'Female' },
+        { name: 'en-US-TonyNeural', label: 'Tony', lang: 'en-US', gender: 'Male' },
+        { name: 'en-US-NancyNeural', label: 'Nancy', lang: 'en-US', gender: 'Female' },
+        { name: 'en-US-AmberNeural', label: 'Amber', lang: 'en-US', gender: 'Female' },
+        { name: 'en-GB-SoniaNeural', label: 'Sonia (UK)', lang: 'en-GB', gender: 'Female' },
+        { name: 'en-GB-RyanNeural', label: 'Ryan (UK)', lang: 'en-GB', gender: 'Male' },
+        { name: 'en-AU-NatashaNeural', label: 'Natasha (AU)', lang: 'en-AU', gender: 'Female' },
+        { name: 'en-AU-WilliamNeural', label: 'William (AU)', lang: 'en-AU', gender: 'Male' },
+    ];
+
+    let _edgeVoiceName = localStorage.getItem('shadowingVoice') || 'en-US-AvaMultilingualNeural';
+    let _currentAudio = null;
+    let _currentWs = null;
     const _voiceSelect = document.getElementById('shadowing-voice-select');
 
+    // Populate dropdown
     function populateVoiceList() {
-        if (!window.speechSynthesis || !_voiceSelect) return;
-        const voices = speechSynthesis.getVoices();
-        if (voices.length === 0) return;
-        
+        if (!_voiceSelect) return;
         _voiceSelect.innerHTML = '';
-        const savedVoiceName = localStorage.getItem('shadowingVoice') || '';
-        
-        // Sort: English voices first, then others
-        const enVoices = voices.filter(v => v.lang.startsWith('en'));
-        const otherVoices = voices.filter(v => !v.lang.startsWith('en'));
-        
-        // English group
-        if (enVoices.length > 0) {
-            const grp = document.createElement('optgroup');
-            grp.label = 'English';
-            enVoices.forEach(voice => {
-                const opt = document.createElement('option');
-                opt.value = voice.name;
-                const label = voice.name.replace('Microsoft ', '').replace(' Online (Natural)', '');
-                opt.textContent = label + ' (' + voice.lang + ')';
-                if (voice.name === savedVoiceName) {
-                    opt.selected = true;
-                    _selectedVoice = voice;
-                }
-                grp.appendChild(opt);
-            });
-            _voiceSelect.appendChild(grp);
-        }
-        
-        // Other languages group
-        if (otherVoices.length > 0) {
-            const grp = document.createElement('optgroup');
-            grp.label = 'Diğer Diller';
-            otherVoices.forEach(voice => {
-                const opt = document.createElement('option');
-                opt.value = voice.name;
-                opt.textContent = voice.name + ' (' + voice.lang + ')';
-                if (voice.name === savedVoiceName) {
-                    opt.selected = true;
-                    _selectedVoice = voice;
-                }
-                grp.appendChild(opt);
-            });
-            _voiceSelect.appendChild(grp);
-        }
 
-        // Auto-select best English voice if nothing saved
-        if (!_selectedVoice && enVoices.length > 0) {
-            const best = enVoices.find(v => v.name.includes('Premium'))
-                || enVoices.find(v => v.name.includes('Enhanced'))
-                || enVoices.find(v => v.name.includes('Ava'))
-                || enVoices.find(v => v.name.includes('Samantha'))
-                || enVoices[0];
-            _selectedVoice = best;
-            // Select in dropdown
-            for (let i = 0; i < _voiceSelect.options.length; i++) {
-                if (_voiceSelect.options[i].value === best.name) {
-                    _voiceSelect.selectedIndex = i;
-                    break;
-                }
-            }
-        }
-        
-        console.log('[Shadowing] ' + voices.length + ' ses yüklendi, ' + enVoices.length + ' İngilizce');
+        const females = EDGE_TTS_VOICES.filter(v => v.gender === 'Female');
+        const males = EDGE_TTS_VOICES.filter(v => v.gender === 'Male');
+
+        [{ label: '👩 Kadın Sesler', list: females }, { label: '👨 Erkek Sesler', list: males }].forEach(group => {
+            const grp = document.createElement('optgroup');
+            grp.label = group.label;
+            group.list.forEach(voice => {
+                const opt = document.createElement('option');
+                opt.value = voice.name;
+                opt.textContent = voice.label + ' (' + voice.lang + ')';
+                if (voice.name === _edgeVoiceName) opt.selected = true;
+                grp.appendChild(opt);
+            });
+            _voiceSelect.appendChild(grp);
+        });
     }
+    populateVoiceList();
 
     if (_voiceSelect) {
         _voiceSelect.addEventListener('change', function() {
-            const voices = speechSynthesis.getVoices();
-            const selectedName = _voiceSelect.value;
-            const found = voices.find(v => v.name === selectedName);
-            if (found) {
-                _selectedVoice = found;
-                localStorage.setItem('shadowingVoice', found.name);
-                // Preview
-                speakSentence('Hello, this is my voice.');
-            }
+            _edgeVoiceName = _voiceSelect.value;
+            localStorage.setItem('shadowingVoice', _edgeVoiceName);
+            speakSentence('Hello, this is my voice.');
         });
     }
 
-    if (window.speechSynthesis) {
-        speechSynthesis.getVoices();
-        speechSynthesis.addEventListener('voiceschanged', populateVoiceList);
-        setTimeout(populateVoiceList, 100);
+    // Edge TTS via WebSocket
+    function _uuid() {
+        return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0;
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+    }
+
+    function _escapeXml(str) {
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function _cancelEdgeTTS() {
+        if (_currentAudio) {
+            _currentAudio.pause();
+            _currentAudio.src = '';
+            _currentAudio = null;
+        }
+        if (_currentWs) {
+            try { _currentWs.close(); } catch(e) {}
+            _currentWs = null;
+        }
+    }
+
+    function edgeTTSSpeak(text, voiceName, rate, onEnd) {
+        _cancelEdgeTTS();
+
+        var connId = _uuid();
+        var requestId = _uuid();
+        var wsUrl = 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4&ConnectionId=' + connId;
+
+        var audioChunks = [];
+        var ws;
+
+        try {
+            ws = new WebSocket(wsUrl);
+        } catch(e) {
+            console.error('[EdgeTTS] WebSocket failed:', e);
+            if (onEnd) onEnd();
+            return;
+        }
+
+        _currentWs = ws;
+
+        ws.onopen = function() {
+            // Config message
+            var configMsg = 'Content-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n' +
+                JSON.stringify({
+                    context: {
+                        synthesis: {
+                            audio: {
+                                metadataoptions: { sentenceBoundaryEnabled: 'false', wordBoundaryEnabled: 'false' },
+                                outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
+                            }
+                        }
+                    }
+                });
+            ws.send(configMsg);
+
+            // SSML
+            var ratePercent = Math.round((rate - 1) * 100);
+            var rateStr = (ratePercent >= 0 ? '+' : '') + ratePercent + '%';
+
+            var ssml = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='" + voiceName.substring(0, 5) + "'>" +
+                "<voice name='" + voiceName + "'>" +
+                "<prosody rate='" + rateStr + "' pitch='+0Hz'>" + _escapeXml(text) + "</prosody>" +
+                "</voice></speak>";
+
+            var ssmlMsg = 'X-RequestId:' + requestId + '\r\nContent-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n' + ssml;
+            ws.send(ssmlMsg);
+        };
+
+        ws.onmessage = function(event) {
+            if (event.data instanceof Blob) {
+                // Binary audio data
+                var reader = new FileReader();
+                reader.onload = function() {
+                    var buf = reader.result;
+                    // Find "Path:audio\r\n" header end
+                    var view = new Uint8Array(buf);
+                    var headerEnd = -1;
+                    for (var i = 0; i < Math.min(view.length, 500); i++) {
+                        if (view[i] === 0x50 && view[i+1] === 0x61 && view[i+2] === 0x74 && view[i+3] === 0x68 &&
+                            view[i+4] === 0x3A && view[i+5] === 0x61 && view[i+6] === 0x75 && view[i+7] === 0x64) {
+                            // Found "Path:aud", scan for \r\n
+                            for (var j = i; j < Math.min(view.length, i + 50); j++) {
+                                if (view[j] === 0x0D && view[j+1] === 0x0A) {
+                                    headerEnd = j + 2;
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    if (headerEnd > 0) {
+                        audioChunks.push(buf.slice(headerEnd));
+                    }
+                };
+                reader.readAsArrayBuffer(event.data);
+            } else if (typeof event.data === 'string') {
+                if (event.data.includes('Path:turn.end')) {
+                    ws.close();
+                    _currentWs = null;
+                    // Play collected audio
+                    if (audioChunks.length > 0) {
+                        var blob = new Blob(audioChunks, { type: 'audio/mpeg' });
+                        var url = URL.createObjectURL(blob);
+                        var audio = new Audio(url);
+                        _currentAudio = audio;
+                        audio.onended = function() {
+                            URL.revokeObjectURL(url);
+                            _currentAudio = null;
+                            if (onEnd) onEnd();
+                        };
+                        audio.onerror = function() {
+                            URL.revokeObjectURL(url);
+                            _currentAudio = null;
+                            if (onEnd) onEnd();
+                        };
+                        audio.play().catch(function(e) {
+                            console.error('[EdgeTTS] Play failed:', e);
+                            if (onEnd) onEnd();
+                        });
+                    } else {
+                        if (onEnd) onEnd();
+                    }
+                }
+            }
+        };
+
+        ws.onerror = function(err) {
+            console.error('[EdgeTTS] Error:', err);
+            _currentWs = null;
+            if (onEnd) onEnd();
+        };
+
+        ws.onclose = function() {
+            _currentWs = null;
+        };
     }
 
     function speakSentence(text, rate, onEnd) {
-        if (!window.speechSynthesis) return;
-        rate = rate || 0.85;
-        speechSynthesis.cancel();
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.lang = 'en-US';
-        utter.rate = rate;
-        if (_selectedVoice) utter.voice = _selectedVoice;
-        if (onEnd) utter.onend = onEnd;
-        speechSynthesis.speak(utter);
+        if (!text) return;
+        rate = rate || 0.9;
+        _cancelEdgeTTS();
+        if (window.speechSynthesis) speechSynthesis.cancel();
+        edgeTTSSpeak(text, _edgeVoiceName, rate, onEnd);
     }
     window.speakSentence = speakSentence;
 
@@ -3479,6 +3583,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Clear timer & TTS
             if (shadowingTimerHandle) { clearTimeout(shadowingTimerHandle); shadowingTimerHandle = null; }
+            _cancelEdgeTTS();
             if (window.speechSynthesis) speechSynthesis.cancel();
 
             // card is an array of items (grouped)
@@ -3592,6 +3697,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Next button
             els.btnShadowingNext.onclick = function() {
                 if (shadowingTimerHandle) { clearTimeout(shadowingTimerHandle); shadowingTimerHandle = null; }
+                _cancelEdgeTTS();
                 if (window.speechSynthesis) speechSynthesis.cancel();
                 loadNextCard();
             };
@@ -4274,6 +4380,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         clearSavedSession();
         // Clear shadowing timer & TTS
         if (shadowingTimerHandle) { clearTimeout(shadowingTimerHandle); shadowingTimerHandle = null; }
+        _cancelEdgeTTS();
         if (window.speechSynthesis) speechSynthesis.cancel();
         els.practiceActive.style.display = 'none';
         els.practiceComplete.style.display = 'block';
