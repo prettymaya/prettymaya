@@ -243,25 +243,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     function populateVoiceList() {
         if (!window.speechSynthesis || !_voiceSelect) return;
         const voices = speechSynthesis.getVoices();
-        const enVoices = voices.filter(v => v.lang.startsWith('en'));
+        if (voices.length === 0) return;
         
         _voiceSelect.innerHTML = '';
         const savedVoiceName = localStorage.getItem('shadowingVoice') || '';
         
-        enVoices.forEach((voice, i) => {
-            const opt = document.createElement('option');
-            opt.value = i;
-            const label = voice.name.replace('Microsoft ', '').replace(' Online (Natural)', '');
-            opt.textContent = label + ' (' + voice.lang + ')';
-            opt.dataset.voiceName = voice.name;
-            if (voice.name === savedVoiceName) {
-                opt.selected = true;
-                _selectedVoice = voice;
-            }
-            _voiceSelect.appendChild(opt);
-        });
+        // Sort: English voices first, then others
+        const enVoices = voices.filter(v => v.lang.startsWith('en'));
+        const otherVoices = voices.filter(v => !v.lang.startsWith('en'));
+        
+        // English group
+        if (enVoices.length > 0) {
+            const grp = document.createElement('optgroup');
+            grp.label = 'English';
+            enVoices.forEach(voice => {
+                const opt = document.createElement('option');
+                opt.value = voice.name;
+                const label = voice.name.replace('Microsoft ', '').replace(' Online (Natural)', '');
+                opt.textContent = label + ' (' + voice.lang + ')';
+                if (voice.name === savedVoiceName) {
+                    opt.selected = true;
+                    _selectedVoice = voice;
+                }
+                grp.appendChild(opt);
+            });
+            _voiceSelect.appendChild(grp);
+        }
+        
+        // Other languages group
+        if (otherVoices.length > 0) {
+            const grp = document.createElement('optgroup');
+            grp.label = 'Diğer Diller';
+            otherVoices.forEach(voice => {
+                const opt = document.createElement('option');
+                opt.value = voice.name;
+                opt.textContent = voice.name + ' (' + voice.lang + ')';
+                if (voice.name === savedVoiceName) {
+                    opt.selected = true;
+                    _selectedVoice = voice;
+                }
+                grp.appendChild(opt);
+            });
+            _voiceSelect.appendChild(grp);
+        }
 
-        // Auto-select best voice if nothing saved
+        // Auto-select best English voice if nothing saved
         if (!_selectedVoice && enVoices.length > 0) {
             const best = enVoices.find(v => v.name.includes('Premium'))
                 || enVoices.find(v => v.name.includes('Enhanced'))
@@ -269,20 +295,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                 || enVoices.find(v => v.name.includes('Samantha'))
                 || enVoices[0];
             _selectedVoice = best;
-            const idx = enVoices.indexOf(best);
-            if (idx >= 0) _voiceSelect.selectedIndex = idx;
+            // Select in dropdown
+            for (let i = 0; i < _voiceSelect.options.length; i++) {
+                if (_voiceSelect.options[i].value === best.name) {
+                    _voiceSelect.selectedIndex = i;
+                    break;
+                }
+            }
         }
+        
+        console.log('[Shadowing] ' + voices.length + ' ses yüklendi, ' + enVoices.length + ' İngilizce');
     }
 
     if (_voiceSelect) {
         _voiceSelect.addEventListener('change', function() {
-            const voices = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
-            const idx = parseInt(_voiceSelect.value);
-            if (voices[idx]) {
-                _selectedVoice = voices[idx];
-                localStorage.setItem('shadowingVoice', _selectedVoice.name);
-                // Preview voice
-                speakSentence('Hello!', 0.85);
+            const voices = speechSynthesis.getVoices();
+            const selectedName = _voiceSelect.value;
+            const found = voices.find(v => v.name === selectedName);
+            if (found) {
+                _selectedVoice = found;
+                localStorage.setItem('shadowingVoice', found.name);
+                // Preview
+                speakSentence('Hello, this is my voice.');
             }
         });
     }
