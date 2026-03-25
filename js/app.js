@@ -236,40 +236,87 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     window.speakWord = speakWord; // expose for inline onclick
 
-    // ─── TTS Voice System (Web Speech API Only) ─────────────
-    // Safari'de Siri sesi: macOS Ayarlar > Erişilebilirlik > Konuşma İçeriği
-    // Sistem Sesi = Siri olarak ayarla, ardından "Sistem Varsayılanı" seç.
+    // ─── TTS Voice System (Local Server + Web Speech Fallback) ─────
+    // Uses local TTS server (python3 tts_server.py) for Siri/Premium voices
+    // Falls back to Web Speech API if server not running
     
-    let _selectedVoiceName = localStorage.getItem('shadowingVoice') || '__default__';
+    const TTS_SERVER = 'http://localhost:8765';
+    let _selectedVoiceId = localStorage.getItem('shadowingVoice') || 'com.apple.ttsbundle.siri_nicky_en-US_compact';
+    let _ttsServerAvailable = null; // null=unknown, true/false
+    let _currentAudio = null;
     const _voiceSelect = document.getElementById('shadowing-voice-select');
 
-    function populateVoiceList() {
+    // Check if TTS server is running and populate voices
+    function checkTTSServer() {
+        fetch(TTS_SERVER + '/voices', { signal: AbortSignal.timeout(2000) })
+            .then(function(res) { return res.json(); })
+            .then(function(voices) {
+                _ttsServerAvailable = true;
+                console.log('[TTS] ✅ Lokal TTS sunucusu aktif, ' + voices.length + ' ses');
+                populateVoiceListFromServer(voices);
+            })
+            .catch(function() {
+                _ttsServerAvailable = false;
+                console.warn('[TTS] ⚠️ Lokal TTS sunucusu çalışmıyor. Web Speech API kullanılacak.');
+                console.warn('[TTS] Sunucuyu başlat: python3 tts_server.py');
+                populateVoiceListFallback();
+            });
+    }
+
+    function populateVoiceListFromServer(voices) {
         if (!_voiceSelect) return;
         _voiceSelect.innerHTML = '';
 
-        // "System Default" option — Safari uses Siri if set as default in macOS
-        var defOpt = document.createElement('option');
-        defOpt.value = '__default__';
-        defOpt.textContent = '⭐ Sistem Varsayılanı (Siri)';
-        if (_selectedVoiceName === '__default__') defOpt.selected = true;
-        _voiceSelect.appendChild(defOpt);
+        var siriVoices = voices.filter(function(v) { return v.id.includes('siri'); });
+        var otherVoices = voices.filter(function(v) { return !v.id.includes('siri'); });
 
-        // System voices from Web Speech API
+        if (siriVoices.length > 0) {
+            var grp = document.createElement('optgroup');
+            grp.label = '⭐ Siri Sesleri';
+            siriVoices.forEach(function(v) {
+                var opt = document.createElement('option');
+                opt.value = v.id;
+                opt.textContent = '⭐ ' + v.name + ' (' + v.lang + ')';
+                if (v.id === _selectedVoiceId) opt.selected = true;
+                grp.appendChild(opt);
+            });
+            _voiceSelect.appendChild(grp);
+        }
+
+        if (otherVoices.length > 0) {
+            var grp2 = document.createElement('optgroup');
+            grp2.label = 'Diğer Sesler';
+            otherVoices.forEach(function(v) {
+                var opt = document.createElement('option');
+                opt.value = v.id;
+                opt.textContent = v.name + ' (' + v.lang + ') [' + v.quality + ']';
+                if (v.id === _selectedVoiceId) opt.selected = true;
+                grp2.appendChild(opt);
+            });
+            _voiceSelect.appendChild(grp2);
+        }
+    }
+
+    function populateVoiceListFallback() {
+        if (!_voiceSelect) return;
+        _voiceSelect.innerHTML = '';
+        
+        var opt0 = document.createElement('option');
+        opt0.value = '__default__';
+        opt0.textContent = '⚠️ TTS sunucusu kapalı — Web Speech API';
+        opt0.selected = true;
+        _voiceSelect.appendChild(opt0);
+
         if (window.speechSynthesis) {
             var voices = speechSynthesis.getVoices();
             var enVoices = voices.filter(function(v) { return v.lang.startsWith('en'); });
-            
-            console.log('[TTS] Kullanılabilir sesler (' + enVoices.length + '):');
-            enVoices.forEach(function(v) { console.log('  - ' + v.name + ' (' + v.lang + ')'); });
-
             if (enVoices.length > 0) {
                 var grp = document.createElement('optgroup');
                 grp.label = 'Sistem Sesleri';
-                enVoices.forEach(function(voice) {
+                enVoices.forEach(function(v) {
                     var opt = document.createElement('option');
-                    opt.value = voice.name;
-                    opt.textContent = voice.name + ' (' + voice.lang + ')';
-                    if (_selectedVoiceName === voice.name) opt.selected = true;
+                    opt.value = 'webspeech:' + v.name;
+                    opt.textContent = v.name + ' (' + v.lang + ')';
                     grp.appendChild(opt);
                 });
                 _voiceSelect.appendChild(grp);
@@ -277,42 +324,77 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    // Init
+    checkTTSServer();
     if (window.speechSynthesis) {
         speechSynthesis.getVoices();
-        speechSynthesis.addEventListener('voiceschanged', populateVoiceList);
-        setTimeout(populateVoiceList, 200);
-    } else {
-        populateVoiceList();
+        speechSynthesis.addEventListener('voiceschanged', function() {
+            if (!_ttsServerAvailable) populateVoiceListFallback();
+        });
     }
 
     if (_voiceSelect) {
         _voiceSelect.addEventListener('change', function() {
-            _selectedVoiceName = _voiceSelect.value;
-            localStorage.setItem('shadowingVoice', _selectedVoiceName);
+            _selectedVoiceId = _voiceSelect.value;
+            localStorage.setItem('shadowingVoice', _selectedVoiceId);
             speakSentence('Hello, this is my voice.');
         });
     }
 
+    function _cancelTTS() {
+        if (_currentAudio) {
+            _currentAudio.pause();
+            _currentAudio.src = '';
+            _currentAudio = null;
+        }
+        if (window.speechSynthesis) speechSynthesis.cancel();
+    }
+
     function speakSentence(text, rate, onEnd) {
-        if (!text || !window.speechSynthesis) { if (onEnd) onEnd(); return; }
-        rate = rate || 0.9;
-        speechSynthesis.cancel();
+        if (!text) { if (onEnd) onEnd(); return; }
+        rate = rate || 0.5;
+        _cancelTTS();
         
+        // If TTS server available and not a webspeech voice, use server
+        if (_ttsServerAvailable && !_selectedVoiceId.startsWith('webspeech:') && _selectedVoiceId !== '__default__') {
+            var url = TTS_SERVER + '/speak?text=' + encodeURIComponent(text) + 
+                      '&voice=' + encodeURIComponent(_selectedVoiceId) + 
+                      '&rate=' + rate;
+            
+            var audio = new Audio(url);
+            _currentAudio = audio;
+            audio.onended = function() { _currentAudio = null; if (onEnd) onEnd(); };
+            audio.onerror = function() { 
+                console.error('[TTS] Server audio error, falling back');
+                _currentAudio = null;
+                _webSpeechFallback(text, rate, onEnd); 
+            };
+            audio.play().catch(function(e) {
+                console.error('[TTS] Play failed:', e);
+                _webSpeechFallback(text, rate, onEnd);
+            });
+        } else {
+            _webSpeechFallback(text, rate, onEnd);
+        }
+    }
+
+    function _webSpeechFallback(text, rate, onEnd) {
+        if (!window.speechSynthesis) { if (onEnd) onEnd(); return; }
+        speechSynthesis.cancel();
         var utter = new SpeechSynthesisUtterance(text);
         utter.lang = 'en-US';
         utter.rate = rate;
         
-        // If specific voice selected (not default), set it explicitly
-        if (_selectedVoiceName !== '__default__') {
+        var voiceName = _selectedVoiceId.replace('webspeech:', '');
+        if (voiceName && voiceName !== '__default__') {
             var voices = speechSynthesis.getVoices();
-            var target = voices.find(function(v) { return v.name === _selectedVoiceName; });
+            var target = voices.find(function(v) { return v.name === voiceName; });
             if (target) utter.voice = target;
         }
-        // __default__ = don't set voice = Safari uses macOS system default (Siri if configured)
-        
         if (onEnd) utter.onend = onEnd;
         speechSynthesis.speak(utter);
     }
+
     window.speakSentence = speakSentence;
 
     // Shadowing mode state
