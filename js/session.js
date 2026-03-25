@@ -731,3 +731,69 @@ class FlowSessionManager {
         // No-op for flow mode
     }
 }
+
+class ShadowingSessionManager {
+    constructor(meaningSentencesMap) {
+        this.meaningSentences = meaningSentencesMap;
+        this.mainQueue = [];
+        this.position = 0;
+        this.currentCard = null;
+
+        // Build queue: one card per meaning, with a random sentence
+        for (const [mId, sentences] of meaningSentencesMap) {
+            if (sentences.length === 0) continue;
+            const sentence = sentences[Math.floor(Math.random() * sentences.length)];
+            this.mainQueue.push({
+                meaningId: mId,
+                word: sentence.word,
+                hint: sentence.hint || '',
+                englishDefinition: sentence.englishDefinition || '',
+                turkishDefinition: sentence.turkishDefinition || null,
+                sentence: sentence,
+                allSentences: sentences
+            });
+        }
+
+        // Shuffle
+        for (let i = this.mainQueue.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.mainQueue[i], this.mainQueue[j]] = [this.mainQueue[j], this.mainQueue[i]];
+        }
+
+        this.stats = { total: this.mainQueue.length, correct: 0, incorrect: 0 };
+    }
+
+    getNextCard() {
+        if (this.position < this.mainQueue.length) {
+            this.currentCard = this.mainQueue[this.position];
+            this.position++;
+            this.stats.correct = this.position;
+            return this.currentCard;
+        }
+        this.currentCard = null;
+        return null;
+    }
+
+    shuffleSentence() {
+        if (!this.currentCard) return false;
+        const sentences = this.currentCard.allSentences;
+        if (sentences.length <= 1) return false;
+        
+        let next;
+        do {
+            next = sentences[Math.floor(Math.random() * sentences.length)];
+        } while (next.id === this.currentCard.sentence.id && sentences.length > 1);
+        
+        this.currentCard.sentence = next;
+        return true;
+    }
+
+    getProgress() {
+        return {
+            totalWords: this.stats.total,
+            remaining: this.stats.total - this.position,
+            percentage: this.stats.total > 0 ? Math.round((this.position / this.stats.total) * 100) : 0,
+            stats: this.stats
+        };
+    }
+}

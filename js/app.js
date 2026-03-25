@@ -143,6 +143,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         scanOptions: document.getElementById('scan-options'),
         phaseScan: document.getElementById('phase-scan'),
         scanItemsContainer: document.getElementById('scan-items-container'),
+
+        // Shadowing Phase
+        btnModeShadowing: document.getElementById('mode-shadowing'),
+        phaseShadowing: document.getElementById('phase-shadowing'),
+        shadowingSentence: document.getElementById('shadowing-sentence'),
+        shadowingDetails: document.getElementById('shadowing-details'),
+        btnShadowingSpeak: document.getElementById('btn-shadowing-speak'),
+        btnShadowingShuffle: document.getElementById('btn-shadowing-shuffle'),
+        btnShadowingDetails: document.getElementById('btn-shadowing-details'),
+        btnShadowingNext: document.getElementById('btn-shadowing-next'),
         scanPageIndicator: document.getElementById('scan-page-indicator'),
         btnScanPrev: document.getElementById('btn-scan-prev'),
         btnScanNext: document.getElementById('btn-scan-next'),
@@ -225,11 +235,48 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     window.speakWord = speakWord; // expose for inline onclick
 
+    // Shadowing TTS — prefer Ava voice for natural speech
+    let _cachedAvaVoice = null;
+    function _getAvaVoice() {
+        if (_cachedAvaVoice) return _cachedAvaVoice;
+        const voices = speechSynthesis.getVoices();
+        // Try exact match first
+        _cachedAvaVoice = voices.find(v => v.name.includes('AvaMultilingual')) 
+            || voices.find(v => v.name.includes('Ava'))
+            || voices.find(v => v.name.includes('Samantha'))
+            || voices.find(v => v.lang === 'en-US')
+            || null;
+        return _cachedAvaVoice;
+    }
+    // Preload voices (async in some browsers)
+    if (window.speechSynthesis) {
+        speechSynthesis.getVoices();
+        speechSynthesis.addEventListener('voiceschanged', () => { _cachedAvaVoice = null; });
+    }
+
+    function speakSentence(text, rate = 0.85) {
+        if (!window.speechSynthesis) return;
+        speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'en-US';
+        utter.rate = rate;
+        const voice = _getAvaVoice();
+        if (voice) utter.voice = voice;
+        speechSynthesis.speak(utter);
+    }
+    window.speakSentence = speakSentence;
+
+    // Shadowing mode state
+    let shadowingAutoSpeak = true;
+    let shadowingTimerInterval = 0; // 0 = manual, 3/5/8 = seconds
+    let shadowingTimerHandle = null;
+
     // Flow mode state
     let flowTimer = null;
     let flowRevealTimer = null;
     let flowTickInterval = null;
     let flowPaused = false;
+
     let speakingRepeatCount = 2;
     let searchTimeout = null;
     let selectedCategoryId = 'all'; // For word list filtering
@@ -2452,6 +2499,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSession = new ScanSessionManager(readyMeaningsMap, scanPageSize);
         } else if (practiceMode === 'flow') {
             currentSession = new FlowSessionManager(readyMeaningsMap);
+        } else if (practiceMode === 'shadowing') {
+            currentSession = new ShadowingSessionManager(readyMeaningsMap);
         } else {
             currentSession = new SessionManager(readyMeaningsMap, 1);
         }
@@ -2563,6 +2612,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSession = new ScanSessionManager(readyMeaningsMap, scanPageSize);
         } else if (practiceMode === 'flow') {
             currentSession = new FlowSessionManager(readyMeaningsMap);
+        } else if (practiceMode === 'shadowing') {
+            currentSession = new ShadowingSessionManager(readyMeaningsMap);
         } else {
             currentSession = new SessionManager(readyMeaningsMap, 1);
         }
@@ -2649,10 +2700,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (els.btnModeCombined) els.btnModeCombined.className = 'btn btn-secondary';
         if (els.btnModeScan) els.btnModeScan.className = 'btn btn-secondary';
         if (els.btnModeFlow) els.btnModeFlow.className = 'btn btn-secondary';
+        if (els.btnModeShadowing) els.btnModeShadowing.className = 'btn btn-secondary';
         if (els.combinedOptions) els.combinedOptions.style.display = 'none';
         if (els.scanOptions) els.scanOptions.style.display = 'none';
         if (els.speakingOptions) els.speakingOptions.style.display = 'none';
     }
+
+    // Shadowing mode handler
+    if (els.btnModeShadowing) {
+        els.btnModeShadowing.addEventListener('click', () => {
+            practiceMode = 'shadowing';
+            resetAllModeButtons();
+            els.btnModeShadowing.className = 'btn btn-primary';
+            els.countSelectors[0].parentElement.previousElementSibling.textContent = 'Kaç cümle ile pratik yapmak istiyorsun?';
+            els.countSelectors[0].parentElement.style.display = 'flex';
+        });
+    }
+
+    // Shadowing control event listeners
+    document.getElementById('shadowing-auto-speak')?.addEventListener('change', (e) => {
+        shadowingAutoSpeak = e.target.checked;
+    });
+    document.querySelectorAll('.shadowing-timer-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            shadowingTimerInterval = parseInt(btn.dataset.timer);
+            document.querySelectorAll('.shadowing-timer-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        });
+    });
 
     if (els.btnModeCombined) {
         els.btnModeCombined.addEventListener('click', () => {
@@ -2922,6 +2997,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSession = new ScanSessionManager(filteredMap, scanPageSize);
         } else if (practiceMode === 'flow') {
             currentSession = new FlowSessionManager(filteredMap);
+        } else if (practiceMode === 'shadowing') {
+            currentSession = new ShadowingSessionManager(filteredMap);
         } else {
             currentSession = new SessionManager(filteredMap, 1);
         }
@@ -3009,6 +3086,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
             if (els.phaseCombined) els.phaseCombined.style.display = 'none';
             if (els.phaseScan) els.phaseScan.style.display = 'none';
+            if (els.phaseShadowing) els.phaseShadowing.style.display = 'none';
             
             els.warmupWord.textContent = card.word;
             
@@ -3040,6 +3118,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
             if (els.phaseCombined) els.phaseCombined.style.display = 'none';
             if (els.phaseScan) els.phaseScan.style.display = 'none';
+            if (els.phaseShadowing) els.phaseShadowing.style.display = 'none';
             
             // Prepare reading card
             const parts = card.sentence.sentence.split('___');
@@ -3075,6 +3154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
             if (els.phaseCombined) els.phaseCombined.style.display = 'none';
             if (els.phaseScan) els.phaseScan.style.display = 'none';
+            if (els.phaseShadowing) els.phaseShadowing.style.display = 'none';
             
             // Expand container for speaking mode
             els.practiceActive.style.maxWidth = '1400px';
@@ -3294,6 +3374,105 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        // ═══ SHADOWING MODE ═══
+        if (currentCardMode === 'shadowing') {
+            // Hide all other phases
+            els.phaseQuestion.style.display = 'none';
+            els.phaseResult.classList.remove('visible');
+            els.phaseWriting.classList.remove('visible');
+            els.phaseReading.style.display = 'none';
+            els.phaseWarmup.style.display = 'none';
+            if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
+            if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
+            if (els.phaseCombined) els.phaseCombined.style.display = 'none';
+            if (els.phaseScan) els.phaseScan.style.display = 'none';
+            if (els.phaseShadowing) els.phaseShadowing.style.display = 'none';
+
+            // Container width
+            els.practiceActive.style.maxWidth = '900px';
+
+            // Clear timer
+            if (shadowingTimerHandle) { clearTimeout(shadowingTimerHandle); shadowingTimerHandle = null; }
+
+            // Render sentence with highlighted word
+            function renderShadowingSentence() {
+                const sentence = card.sentence;
+                const answer = sentence.answer || card.word;
+                const sentenceText = sentence.sentence || '';
+                
+                // Highlight the answer word in the sentence
+                const regex = new RegExp(`\\b(${answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\b`, 'gi');
+                const highlighted = sentenceText.replace(regex, '<span class="shadowing-highlight">$1</span>');
+                
+                els.shadowingSentence.innerHTML = highlighted;
+
+                // Fill details
+                document.getElementById('shadowing-det-word').textContent = card.word || '';
+                document.getElementById('shadowing-det-en').textContent = card.englishDefinition || '';
+                document.getElementById('shadowing-det-tr').textContent = card.turkishDefinition || '—';
+                document.getElementById('shadowing-det-sentence-tr').textContent = sentence.turkishSentence || sentence.turkish || '—';
+                document.getElementById('shadowing-det-hint').textContent = card.hint || '—';
+            }
+            renderShadowingSentence();
+
+            // Auto-speak
+            if (shadowingAutoSpeak) {
+                setTimeout(() => {
+                    speakSentence(card.sentence.sentence || '');
+                }, 300);
+            }
+
+            // Auto-advance timer
+            if (shadowingTimerInterval > 0) {
+                shadowingTimerHandle = setTimeout(() => {
+                    if (els.btnShadowingNext) els.btnShadowingNext.click();
+                }, shadowingTimerInterval * 1000);
+            }
+
+            // Speak button
+            els.btnShadowingSpeak.onclick = () => {
+                speakSentence(card.sentence.sentence || '');
+            };
+
+            // Shuffle sentence button
+            els.btnShadowingShuffle.onclick = () => {
+                if (currentSession && currentSession.shuffleSentence) {
+                    currentSession.shuffleSentence();
+                    renderShadowingSentence();
+                    if (shadowingAutoSpeak) {
+                        speakSentence(card.sentence.sentence || '');
+                    }
+                } else {
+                    showToast('Başka cümle bulunamadı.', 'info');
+                }
+            };
+
+            // Details toggle
+            els.btnShadowingDetails.onclick = () => {
+                const det = els.shadowingDetails;
+                if (det.style.display === 'none') {
+                    det.style.display = 'flex';
+                    els.btnShadowingDetails.innerHTML = '<i class="fa-solid fa-chevron-up"></i> Gizle';
+                } else {
+                    det.style.display = 'none';
+                    els.btnShadowingDetails.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Detaylar';
+                }
+            };
+            // Reset details
+            els.shadowingDetails.style.display = 'none';
+            els.btnShadowingDetails.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Detaylar';
+
+            // Next button
+            els.btnShadowingNext.onclick = () => {
+                if (shadowingTimerHandle) { clearTimeout(shadowingTimerHandle); shadowingTimerHandle = null; }
+                speechSynthesis.cancel();
+                loadNextCard();
+            };
+
+            if (els.phaseShadowing) els.phaseShadowing.style.display = 'block';
+            return;
+        }
+
         if (card.type === 'warmup' && practiceMode === 'combined') {
             // Combined warmup phase
             els.phaseQuestion.style.display = 'none';
@@ -3304,6 +3483,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
             if (els.phaseCombined) els.phaseCombined.style.display = 'none';
             if (els.phaseScan) els.phaseScan.style.display = 'none';
+            if (els.phaseShadowing) els.phaseShadowing.style.display = 'none';
             
             els.combinedWarmupWord.textContent = card.word;
             els.combinedWarmupHint.textContent = card.hint || '';
@@ -3325,6 +3505,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (els.phaseSpeaking) els.phaseSpeaking.style.display = 'none';
             if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
             if (els.phaseScan) els.phaseScan.style.display = 'none';
+            if (els.phaseShadowing) els.phaseShadowing.style.display = 'none';
             
             els.combinedSentencesContainer.innerHTML = '';
             
@@ -3468,6 +3649,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (els.phaseCombinedWarmup) els.phaseCombinedWarmup.style.display = 'none';
             if (els.phaseCombined) els.phaseCombined.style.display = 'none';
             if (els.phaseScan) els.phaseScan.style.display = 'none';
+            if (els.phaseShadowing) els.phaseShadowing.style.display = 'none';
             if (els.phaseFlow) els.phaseFlow.style.display = 'block';
 
             renderFlowCard(card);
@@ -3957,6 +4139,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function finishSessionUI() {
         clearSavedSession();
+        // Clear shadowing timer & TTS
+        if (shadowingTimerHandle) { clearTimeout(shadowingTimerHandle); shadowingTimerHandle = null; }
+        if (window.speechSynthesis) speechSynthesis.cancel();
         els.practiceActive.style.display = 'none';
         els.practiceComplete.style.display = 'block';
 

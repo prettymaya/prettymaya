@@ -2408,3 +2408,165 @@ option {
     }
 }
 
+/* ═══════════════════════════════════════════════
+   Shadowing Mode
+   ═══════════════════════════════════════════════ */
+
+.shadowing-controls-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    flex-wrap: wrap;
+}
+
+.shadowing-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.shadowing-timer-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.shadowing-timer-btn {
+    font-size: 0.75rem !important;
+    padding: 4px 10px !important;
+    border-radius: 6px !important;
+}
+
+.shadowing-timer-btn.active {
+    background: rgba(14, 165, 233, 0.2) !important;
+    color: #0ea5e9 !important;
+    border-color: rgba(14, 165, 233, 0.4) !important;
+}
+
+.shadowing-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 32px 28px;
+    text-align: center;
+    margin-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    transition: border-color var(--transition-base);
+}
+
+.shadowing-card:hover {
+    border-color: rgba(14, 165, 233, 0.3);
+}
+
+.shadowing-sentence {
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.6;
+    letter-spacing: 0.01em;
+}
+
+.shadowing-highlight {
+    color: #0ea5e9;
+    background: rgba(14, 165, 233, 0.12);
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-weight: 800;
+    text-decoration: underline;
+    text-decoration-color: rgba(14, 165, 233, 0.4);
+    text-underline-offset: 3px;
+}
+
+.shadowing-card-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.shadowing-card-actions .btn {
+    font-size: 0.85rem;
+    padding: 8px 18px;
+}
+
+.shadowing-details-toggle {
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    color: var(--accent-purple-light);
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: inherit;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+}
+
+.shadowing-details-toggle:hover {
+    background: rgba(139, 92, 246, 0.16);
+    border-color: rgba(139, 92, 246, 0.35);
+}
+
+.shadowing-details {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    animation: fadeIn 0.2s ease;
+}
+
+.shadowing-detail-row {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+}
+
+.shadowing-detail-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    min-width: 75px;
+    flex-shrink: 0;
+}
+
+.shadowing-detail-value {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+    .shadowing-sentence {
+        font-size: 1.2rem;
+    }
+
+    .shadowing-card {
+        padding: 20px 16px;
+    }
+
+    .shadowing-controls-top {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

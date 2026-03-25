@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" href="icon.png">
     <!-- Icons: FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="css/style.css?v=59">
+    <link rel="stylesheet" href="css/style.css?v=60">
 </head>
 <body>
 
@@ -313,6 +313,7 @@
                             <button class="btn btn-secondary" id="mode-combined" style="background: rgba(168, 85, 247, 0.15); color: #a855f7; border-color: rgba(168, 85, 247, 0.3);">🃏 Birleşik Kart</button>
                             <button class="btn btn-secondary" id="mode-scan" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: rgba(56, 189, 248, 0.3);">📖 Hızlı Tarama</button>
                             <button class="btn btn-secondary" id="mode-flow" style="background: rgba(236, 72, 153, 0.15); color: #ec4899; border-color: rgba(236, 72, 153, 0.3);">⚡ Akış Modu</button>
+                            <button class="btn btn-secondary" id="mode-shadowing" style="background: rgba(14, 165, 233, 0.15); color: #0ea5e9; border-color: rgba(14, 165, 233, 0.3);">🎤 Gölgeleme (Shadowing)</button>
                         </div>
 
                         <!-- Combined Card Options (hidden by default) -->
@@ -560,7 +561,59 @@
                             </div>
                             
                             <button class="btn btn-primary btn-lg" id="btn-speaking-next" style="width: 100%; max-width: 300px; margin: 0 auto; display: block;">
-                                Sıradaki 3 Kelime <i class="fa-solid fa-forward"></i>
+                                Sıradaki 4 Kelime <i class="fa-solid fa-forward"></i>
+                            </button>
+                        </div>
+
+                        <!-- Shadowing Phase -->
+                        <div id="phase-shadowing" style="display: none; padding: 10px;">
+                            <div class="shadowing-controls-top">
+                                <label class="shadowing-toggle-label">
+                                    <input type="checkbox" id="shadowing-auto-speak" checked>
+                                    <span>🔊 Otomatik Seslendir</span>
+                                </label>
+                                <div class="shadowing-timer-controls">
+                                    <span style="font-size:0.78rem;color:var(--text-secondary);margin-right:6px;">Otomatik:</span>
+                                    <button class="btn btn-ghost btn-sm shadowing-timer-btn active" data-timer="0">Manuel</button>
+                                    <button class="btn btn-ghost btn-sm shadowing-timer-btn" data-timer="3">3s</button>
+                                    <button class="btn btn-ghost btn-sm shadowing-timer-btn" data-timer="5">5s</button>
+                                    <button class="btn btn-ghost btn-sm shadowing-timer-btn" data-timer="8">8s</button>
+                                </div>
+                            </div>
+                            <div class="shadowing-card" id="shadowing-card">
+                                <div class="shadowing-sentence" id="shadowing-sentence"></div>
+                                <div class="shadowing-card-actions">
+                                    <button class="btn btn-ghost btn-sm" id="btn-shadowing-speak" title="Seslendir">🔊 Dinle</button>
+                                    <button class="btn btn-ghost btn-sm" id="btn-shadowing-shuffle" title="Başka Cümle"><i class="fa-solid fa-shuffle"></i> Başka Cümle</button>
+                                </div>
+                                <button class="shadowing-details-toggle" id="btn-shadowing-details">
+                                    <i class="fa-solid fa-chevron-down"></i> Detaylar
+                                </button>
+                                <div class="shadowing-details" id="shadowing-details" style="display:none;">
+                                    <div class="shadowing-detail-row">
+                                        <span class="shadowing-detail-label">Kelime:</span>
+                                        <span class="shadowing-detail-value" id="shadowing-det-word"></span>
+                                    </div>
+                                    <div class="shadowing-detail-row">
+                                        <span class="shadowing-detail-label">🇬🇧 Anlam:</span>
+                                        <span class="shadowing-detail-value" id="shadowing-det-en"></span>
+                                    </div>
+                                    <div class="shadowing-detail-row">
+                                        <span class="shadowing-detail-label">🇹🇷 Çeviri:</span>
+                                        <span class="shadowing-detail-value" id="shadowing-det-tr"></span>
+                                    </div>
+                                    <div class="shadowing-detail-row">
+                                        <span class="shadowing-detail-label">🇹🇷 Cümle:</span>
+                                        <span class="shadowing-detail-value" id="shadowing-det-sentence-tr"></span>
+                                    </div>
+                                    <div class="shadowing-detail-row">
+                                        <span class="shadowing-detail-label">İpucu:</span>
+                                        <span class="shadowing-detail-value" id="shadowing-det-hint"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary btn-lg" id="btn-shadowing-next" style="width: 100%; max-width: 400px; margin: 0 auto; display: block;">
+                                Sonraki <i class="fa-solid fa-forward"></i>
                             </button>
                         </div>
 
@@ -901,11 +954,11 @@
     <div class="toast-container" id="toast-container"></div>
 
     <!-- Scripts -->
-    <script src="js/db.js?v=55"></script>
-    <script src="js/sync.js?v=55"></script>
-    <script src="js/dictionary.js?v=55"></script>
-    <script src="js/gemini.js?v=55"></script>
-    <script src="js/session.js?v=55"></script>
-    <script src="js/app.js?v=55"></script>
+    <script src="js/db.js?v=56"></script>
+    <script src="js/sync.js?v=56"></script>
+    <script src="js/dictionary.js?v=56"></script>
+    <script src="js/gemini.js?v=56"></script>
+    <script src="js/session.js?v=56"></script>
+    <script src="js/app.js?v=56"></script>
 </body>
 </html>
