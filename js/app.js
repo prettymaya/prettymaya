@@ -292,17 +292,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         _piperLoading = true;
         var cdns = [
-            'https://esm.sh/@nicholasgasior/piper-tts-web@1.0.2',
-            'https://esm.sh/@mintplex-labs/piper-tts-web@1.0.5',
+            'https://cdn.jsdelivr.net/npm/@mintplex-labs/piper-tts-web/+esm',
+            'https://cdn.jsdelivr.net/npm/@mintplex-labs/piper-tts-web@1.0.4/+esm',
         ];
         for (var i = 0; i < cdns.length; i++) {
             try {
                 console.log('[Piper] Yükleniyor: ' + cdns[i]);
                 _piperTTS = await import(cdns[i]);
-                console.log('[Piper] ✅ Modül yüklendi');
+                console.log('[Piper] ✅ Modül yüklendi, API:', Object.keys(_piperTTS));
                 return _piperTTS;
-            } catch(e) { console.warn('[Piper] CDN ' + i + ' başarısız:', e); }
+            } catch(e) { console.warn('[Piper] CDN ' + i + ' başarısız:', e.message || e); }
         }
+        console.error('[Piper] ❌ Tüm CDN kaynakları başarısız');
         _piperLoading = false;
         return null;
     }
