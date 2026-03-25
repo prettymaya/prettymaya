@@ -236,38 +236,71 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     window.speakWord = speakWord; // expose for inline onclick
 
-    // Shadowing TTS — prefer premium/enhanced voices for natural speech
-    let _cachedBestVoice = null;
-    function _getBestEnVoice() {
-        if (_cachedBestVoice) return _cachedBestVoice;
+    // ─── Shadowing TTS Voice System ─────────────────────────
+    let _selectedVoice = null;
+    const _voiceSelect = document.getElementById('shadowing-voice-select');
+
+    function populateVoiceList() {
+        if (!window.speechSynthesis || !_voiceSelect) return;
         const voices = speechSynthesis.getVoices();
         const enVoices = voices.filter(v => v.lang.startsWith('en'));
-        // Prefer premium/enhanced voices (macOS has 'Premium', 'Enhanced')
-        _cachedBestVoice = enVoices.find(v => v.name.includes('AvaMultilingual'))
-            || enVoices.find(v => v.name.includes('Premium'))
-            || enVoices.find(v => v.name.includes('Enhanced'))
-            || enVoices.find(v => v.name.includes('Ava'))
-            || enVoices.find(v => v.name.includes('Samantha'))
-            || enVoices.find(v => v.name.includes('Karen'))
-            || enVoices.find(v => v.name.includes('Daniel'))
-            || enVoices.find(v => v.lang === 'en-US')
-            || null;
-        return _cachedBestVoice;
-    }
-    // Preload voices (async in some browsers)
-    if (window.speechSynthesis) {
-        speechSynthesis.getVoices();
-        speechSynthesis.addEventListener('voiceschanged', () => { _cachedBestVoice = null; });
+        
+        _voiceSelect.innerHTML = '';
+        const savedVoiceName = localStorage.getItem('shadowingVoice') || '';
+        
+        enVoices.forEach((voice, i) => {
+            const opt = document.createElement('option');
+            opt.value = i;
+            const label = voice.name.replace('Microsoft ', '').replace(' Online (Natural)', '');
+            opt.textContent = label + ' (' + voice.lang + ')';
+            opt.dataset.voiceName = voice.name;
+            if (voice.name === savedVoiceName) {
+                opt.selected = true;
+                _selectedVoice = voice;
+            }
+            _voiceSelect.appendChild(opt);
+        });
+
+        // Auto-select best voice if nothing saved
+        if (!_selectedVoice && enVoices.length > 0) {
+            const best = enVoices.find(v => v.name.includes('Premium'))
+                || enVoices.find(v => v.name.includes('Enhanced'))
+                || enVoices.find(v => v.name.includes('Ava'))
+                || enVoices.find(v => v.name.includes('Samantha'))
+                || enVoices[0];
+            _selectedVoice = best;
+            const idx = enVoices.indexOf(best);
+            if (idx >= 0) _voiceSelect.selectedIndex = idx;
+        }
     }
 
-    function speakSentence(text, rate = 0.85, onEnd = null) {
+    if (_voiceSelect) {
+        _voiceSelect.addEventListener('change', function() {
+            const voices = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
+            const idx = parseInt(_voiceSelect.value);
+            if (voices[idx]) {
+                _selectedVoice = voices[idx];
+                localStorage.setItem('shadowingVoice', _selectedVoice.name);
+                // Preview voice
+                speakSentence('Hello!', 0.85);
+            }
+        });
+    }
+
+    if (window.speechSynthesis) {
+        speechSynthesis.getVoices();
+        speechSynthesis.addEventListener('voiceschanged', populateVoiceList);
+        setTimeout(populateVoiceList, 100);
+    }
+
+    function speakSentence(text, rate, onEnd) {
         if (!window.speechSynthesis) return;
+        rate = rate || 0.85;
         speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(text);
         utter.lang = 'en-US';
         utter.rate = rate;
-        const voice = _getBestEnVoice();
-        if (voice) utter.voice = voice;
+        if (_selectedVoice) utter.voice = _selectedVoice;
         if (onEnd) utter.onend = onEnd;
         speechSynthesis.speak(utter);
     }
