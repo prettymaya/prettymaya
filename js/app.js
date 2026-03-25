@@ -148,7 +148,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnModeShadowing: document.getElementById('mode-shadowing'),
         phaseShadowing: document.getElementById('phase-shadowing'),
         shadowingSentences: document.getElementById('shadowing-sentences'),
-        shadowingDetailPopup: document.getElementById('shadowing-detail-popup'),
+        shadowingPopupOverlay: document.getElementById('shadowing-popup-overlay'),
+        shadowingPopupClose: document.getElementById('shadowing-popup-close'),
         btnShadowingSpeak: document.getElementById('btn-shadowing-speak'),
         btnShadowingShuffle: document.getElementById('btn-shadowing-shuffle'),
         btnShadowingNext: document.getElementById('btn-shadowing-next'),
@@ -3416,9 +3417,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             // card is an array of items (grouped)
             const items = card;
 
-            // Build full text for TTS
+            // Build full text for TTS (replace ___ with answer word)
             function getShadowingFullText() {
-                return items.map(it => it.sentence.sentence || '').join('. ');
+                return items.map(function(it) {
+                    var answer = it.sentence.answer || it.word;
+                    return (it.sentence.sentence || '').replace(/___/g, answer);
+                }).join('. ');
             }
 
             // Render all sentences with highlighted clickable words
@@ -3427,19 +3431,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                 items.forEach((item, idx) => {
                     const sentence = item.sentence;
                     const answer = sentence.answer || item.word;
-                    const sentenceText = sentence.sentence || '';
+                    let sentenceText = sentence.sentence || '';
                     
-                    const escaped = answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    const regex = new RegExp('\\b(' + escaped + ')\\b', 'gi');
-                    const highlighted = sentenceText.replace(regex, 
-                        '<span class="shadowing-highlight" data-idx="' + idx + '">$1</span>'
-                    );
+                    // Replace ___ with highlighted answer word
+                    const highlightSpan = '<span class="shadowing-highlight" data-idx="' + idx + '">' + answer + '</span>';
+                    let highlighted = sentenceText.replace(/___/g, highlightSpan);
+                    
+                    // Also highlight any other occurrences of the word
+                    if (!sentenceText.includes('___')) {
+                        const escaped = answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const regex = new RegExp('\\b(' + escaped + ')\\b', 'gi');
+                        highlighted = sentenceText.replace(regex, 
+                            '<span class="shadowing-highlight" data-idx="' + idx + '">$1</span>'
+                        );
+                    }
                     
                     html += '<div class="shadowing-sentence-line" data-idx="' + idx + '">' + highlighted + '</div>';
                 });
                 els.shadowingSentences.innerHTML = html;
 
-                // Click handler for highlighted words -> show details
+                // Click handler for highlighted words -> show popup
                 els.shadowingSentences.querySelectorAll('.shadowing-highlight').forEach(function(el) {
                     el.addEventListener('click', function(e) {
                         e.stopPropagation();
@@ -3447,24 +3458,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                         var item = items[idx];
                         if (!item) return;
                         
-                        var popup = els.shadowingDetailPopup;
                         document.getElementById('shadowing-pop-word').textContent = item.word || '';
+                        document.getElementById('shadowing-pop-hint').textContent = item.sentence.hint || '';
                         document.getElementById('shadowing-pop-en').textContent = item.englishDefinition || '';
-                        document.getElementById('shadowing-pop-tr').textContent = item.turkishDefinition || '\u2014';
-                        var sn = item.sentence;
-                        document.getElementById('shadowing-pop-sentence-tr').textContent = sn.turkishSentence || sn.turkish || '\u2014';
+                        document.getElementById('shadowing-pop-tr').textContent = item.turkishDefinition || '—';
+                        document.getElementById('shadowing-pop-sentence-tr').textContent = item.sentence.turkish || '—';
                         
-                        if (popup.style.display === 'flex' && popup.dataset.activeIdx === String(idx)) {
-                            popup.style.display = 'none';
-                        } else {
-                            popup.style.display = 'flex';
-                            popup.dataset.activeIdx = String(idx);
-                        }
+                        els.shadowingPopupOverlay.style.display = 'flex';
                     });
                 });
             }
             renderShadowingGrouped();
-            els.shadowingDetailPopup.style.display = 'none';
+
+            // Popup close handlers
+            els.shadowingPopupClose.onclick = function() {
+                els.shadowingPopupOverlay.style.display = 'none';
+            };
+            els.shadowingPopupOverlay.onclick = function(e) {
+                if (e.target === els.shadowingPopupOverlay) {
+                    els.shadowingPopupOverlay.style.display = 'none';
+                }
+            };
 
             // Auto-speak with repeat-after-speech
             function doShadowingSpeak() {

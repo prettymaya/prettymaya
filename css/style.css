@@ -2515,17 +2515,93 @@ option {
     text-decoration-color: rgba(14, 165, 233, 0.7);
 }
 
-.shadowing-detail-popup {
-    background: rgba(0, 0, 0, 0.35);
-    backdrop-filter: blur(10px);
-    border-radius: 12px;
-    padding: 16px;
+.shadowing-popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.15s ease;
+    padding: 20px;
+}
+
+.shadowing-popup-card {
+    background: linear-gradient(145deg, rgba(30, 30, 50, 0.98), rgba(20, 20, 35, 0.98));
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 16px;
+    padding: 28px 24px;
+    max-width: 440px;
+    width: 100%;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 30px rgba(139, 92, 246, 0.1);
+}
+
+.shadowing-popup-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+}
+
+.shadowing-popup-close:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.shadowing-popup-word {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #0ea5e9;
+    margin-bottom: 4px;
+    text-transform: lowercase;
+}
+
+.shadowing-popup-hint {
+    font-size: 0.88rem;
+    color: #a78bfa;
+    font-weight: 600;
+    margin-bottom: 18px;
+    font-style: italic;
+}
+
+.shadowing-popup-rows {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    border: 1px solid rgba(14, 165, 233, 0.2);
-    margin-bottom: 16px;
-    animation: fadeIn 0.2s ease;
+    gap: 12px;
+}
+
+.shadowing-popup-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.shadowing-popup-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.shadowing-popup-value {
+    font-size: 0.92rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
 }
 
 .shadowing-card-actions {
@@ -2558,43 +2634,8 @@ option {
     width: 100%;
 }
 
-.shadowing-details-toggle:hover {
-    background: rgba(139, 92, 246, 0.16);
-    border-color: rgba(139, 92, 246, 0.35);
-}
 
-.shadowing-details {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 10px;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    animation: fadeIn 0.2s ease;
-}
 
-.shadowing-detail-row {
-    display: flex;
-    gap: 10px;
-    align-items: baseline;
-}
-
-.shadowing-detail-label {
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    min-width: 75px;
-    flex-shrink: 0;
-}
-
-.shadowing-detail-value {
-    font-size: 0.88rem;
-    color: var(--text-secondary);
-    line-height: 1.4;
-}
 
 @media (max-width: 768px) {
     .shadowing-sentence {
