@@ -44,15 +44,20 @@ def get_voices():
             })
     return voices
 
-class TTSHandler(http.server.BaseHTTPRequestHandler):
+SITE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+class TTSHandler(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=SITE_DIR, **kwargs)
+    
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         params = urllib.parse.parse_qs(parsed.query)
         
         if parsed.path == '/voices':
-            self._cors_headers()
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             voices = get_voices()
             self.wfile.write(json.dumps(voices).encode())
@@ -82,10 +87,9 @@ class TTSHandler(http.server.BaseHTTPRequestHandler):
                     return
                 
                 # Serve the audio file
-                self._cors_headers()
                 self.send_response(200)
                 self.send_header('Content-Type', 'audio/x-caf')
-                self.send_header('Content-Disposition', 'inline; filename="speech.caf"')
+                self.send_header('Access-Control-Allow-Origin', '*')
                 
                 with open(tmp.name, 'rb') as f:
                     data = f.read()
@@ -99,20 +103,20 @@ class TTSHandler(http.server.BaseHTTPRequestHandler):
                 except: pass
             return
         
-        self.send_error(404)
+        # All other paths: serve static files (site)
+        super().do_GET()
     
     def do_OPTIONS(self):
-        self._cors_headers()
         self.send_response(200)
-        self.end_headers()
-    
-    def _cors_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', '*')
+        self.end_headers()
     
     def log_message(self, format, *args):
-        print(f"[TTS] {args[0]}")
+        # Only log TTS requests, not static files
+        if '/speak' in str(args[0]) or '/voices' in str(args[0]):
+            print(f"[TTS] {args[0]}")
 
 def main():
     if not ensure_compiled():
@@ -133,6 +137,7 @@ def main():
     print(f"   Test: http://localhost:{PORT}/speak?text=hello&voice={siri_voices[0]['id'] if siri_voices else 'samantha'}")
     print(f"   Press Ctrl+C to stop\n")
     
+    http.server.HTTPServer.allow_reuse_address = True
     server = http.server.HTTPServer(('127.0.0.1', PORT), TTSHandler)
     try:
         server.serve_forever()

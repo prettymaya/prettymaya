@@ -237,18 +237,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.speakWord = speakWord; // expose for inline onclick
 
     // ─── TTS Voice System (Local Server + Web Speech Fallback) ─────
-    // Uses local TTS server (python3 tts_server.py) for Siri/Premium voices
-    // Falls back to Web Speech API if server not running
+    // When running on localhost (python3 tts_server.py), uses Siri/Premium voices
+    // On GitHub Pages, falls back to Web Speech API automatically
     
-    const TTS_SERVER = 'http://localhost:8765';
+    const _isLocalServer = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    const TTS_SERVER = ''; // Relative URLs when on local server
     let _selectedVoiceId = localStorage.getItem('shadowingVoice') || 'com.apple.ttsbundle.siri_nicky_en-US_compact';
-    let _ttsServerAvailable = null; // null=unknown, true/false
+    let _ttsServerAvailable = false;
     let _currentAudio = null;
     const _voiceSelect = document.getElementById('shadowing-voice-select');
 
-    // Check if TTS server is running and populate voices
+    // Check if TTS server is running
     function checkTTSServer() {
-        fetch(TTS_SERVER + '/voices', { signal: AbortSignal.timeout(2000) })
+        if (!_isLocalServer) {
+            console.log('[TTS] GitHub Pages — Web Speech API kullanılacak');
+            populateVoiceListFallback();
+            return;
+        }
+        fetch('/voices', { signal: AbortSignal.timeout(2000) })
             .then(function(res) { return res.json(); })
             .then(function(voices) {
                 _ttsServerAvailable = true;
@@ -357,7 +363,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // If TTS server available and not a webspeech voice, use server
         if (_ttsServerAvailable && !_selectedVoiceId.startsWith('webspeech:') && _selectedVoiceId !== '__default__') {
-            var url = TTS_SERVER + '/speak?text=' + encodeURIComponent(text) + 
+            var url = '/speak?text=' + encodeURIComponent(text) + 
                       '&voice=' + encodeURIComponent(_selectedVoiceId) + 
                       '&rate=' + rate;
             
