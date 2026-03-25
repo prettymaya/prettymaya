@@ -327,18 +327,53 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         var audioChunks = [];
         var ws;
+        var gotAudio = false;
+        var fallbackTimer = null;
+
+        // Fallback to Web Speech API if Edge TTS fails
+        function fallbackSpeak() {
+            if (gotAudio) return;
+            console.warn('[EdgeTTS] Fallback to Web Speech API');
+            if (!window.speechSynthesis) { if (onEnd) onEnd(); return; }
+            var utter = new SpeechSynthesisUtterance(text);
+            utter.lang = 'en-US';
+            utter.rate = rate;
+            // Pick best available Web Speech voice
+            var voices = speechSynthesis.getVoices();
+            var enVoices = voices.filter(function(v) { return v.lang.startsWith('en'); });
+            var best = enVoices.find(function(v) { return v.name.includes('Samantha'); })
+                || enVoices.find(function(v) { return v.name.includes('Daniel'); })
+                || enVoices.find(function(v) { return v.name.includes('Karen'); })
+                || enVoices.find(function(v) { return v.lang === 'en-US'; })
+                || enVoices[0] || null;
+            if (best) utter.voice = best;
+            if (onEnd) utter.onend = onEnd;
+            speechSynthesis.speak(utter);
+        }
 
         try {
             ws = new WebSocket(wsUrl);
+            ws.binaryType = 'arraybuffer'; // Safari compat: receive ArrayBuffer directly
         } catch(e) {
-            console.error('[EdgeTTS] WebSocket failed:', e);
-            if (onEnd) onEnd();
+            console.error('[EdgeTTS] WebSocket create failed:', e);
+            fallbackSpeak();
             return;
         }
 
         _currentWs = ws;
 
+        // Timeout: if no audio in 5 seconds, fallback
+        fallbackTimer = setTimeout(function() {
+            if (!gotAudio) {
+                console.warn('[EdgeTTS] Timeout, falling back');
+                try { ws.close(); } catch(e) {}
+                _currentWs = null;
+                fallbackSpeak();
+            }
+        }, 5000);
+
         ws.onopen = function() {
+            console.log('[EdgeTTS] Connected, sending SSML...');
             // Config message
             var configMsg = 'Content-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n' +
                 JSON.stringify({
@@ -367,36 +402,40 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
 
         ws.onmessage = function(event) {
-            if (event.data instanceof Blob) {
-                // Binary audio data
+            if (event.data instanceof ArrayBuffer) {
+                // Binary audio data (ArrayBuffer mode)
+                var buf = event.data;
+                var view = new Uint8Array(buf);
+                // Edge TTS binary: first 2 bytes = header length (big-endian)
+                if (view.length > 2) {
+                    var headerLen = (view[0] << 8) | view[1];
+                    var audioStart = 2 + headerLen;
+                    if (audioStart < buf.byteLength) {
+                        audioChunks.push(buf.slice(audioStart));
+                    }
+                }
+            } else if (event.data instanceof Blob) {
+                // Blob mode fallback
                 var reader = new FileReader();
                 reader.onload = function() {
                     var buf = reader.result;
-                    // Find "Path:audio\r\n" header end
                     var view = new Uint8Array(buf);
-                    var headerEnd = -1;
-                    for (var i = 0; i < Math.min(view.length, 500); i++) {
-                        if (view[i] === 0x50 && view[i+1] === 0x61 && view[i+2] === 0x74 && view[i+3] === 0x68 &&
-                            view[i+4] === 0x3A && view[i+5] === 0x61 && view[i+6] === 0x75 && view[i+7] === 0x64) {
-                            // Found "Path:aud", scan for \r\n
-                            for (var j = i; j < Math.min(view.length, i + 50); j++) {
-                                if (view[j] === 0x0D && view[j+1] === 0x0A) {
-                                    headerEnd = j + 2;
-                                    break;
-                                }
-                            }
-                            break;
+                    if (view.length > 2) {
+                        var headerLen = (view[0] << 8) | view[1];
+                        var audioStart = 2 + headerLen;
+                        if (audioStart < buf.byteLength) {
+                            audioChunks.push(buf.slice(audioStart));
                         }
-                    }
-                    if (headerEnd > 0) {
-                        audioChunks.push(buf.slice(headerEnd));
                     }
                 };
                 reader.readAsArrayBuffer(event.data);
             } else if (typeof event.data === 'string') {
                 if (event.data.includes('Path:turn.end')) {
+                    gotAudio = true;
+                    if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
                     ws.close();
                     _currentWs = null;
+                    console.log('[EdgeTTS] Received ' + audioChunks.length + ' audio chunks');
                     // Play collected audio
                     if (audioChunks.length > 0) {
                         var blob = new Blob(audioChunks, { type: 'audio/mpeg' });
@@ -409,25 +448,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                             if (onEnd) onEnd();
                         };
                         audio.onerror = function() {
+                            console.error('[EdgeTTS] Audio play error');
                             URL.revokeObjectURL(url);
                             _currentAudio = null;
-                            if (onEnd) onEnd();
+                            fallbackSpeak();
                         };
                         audio.play().catch(function(e) {
                             console.error('[EdgeTTS] Play failed:', e);
-                            if (onEnd) onEnd();
+                            fallbackSpeak();
                         });
                     } else {
-                        if (onEnd) onEnd();
+                        fallbackSpeak();
                     }
                 }
             }
         };
 
         ws.onerror = function(err) {
-            console.error('[EdgeTTS] Error:', err);
+            console.error('[EdgeTTS] WebSocket error:', err);
             _currentWs = null;
-            if (onEnd) onEnd();
+            if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+            if (!gotAudio) fallbackSpeak();
         };
 
         ws.onclose = function() {
