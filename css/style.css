@@ -2477,15 +2477,55 @@ option {
     letter-spacing: 0.01em;
 }
 
+.shadowing-sentence-line {
+    font-size: 1.3rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.7;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    text-align: left;
+}
+
+.shadowing-sentence-line:last-child {
+    border-bottom: none;
+}
+
+.shadowing-sentences {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
 .shadowing-highlight {
     color: #0ea5e9;
     background: rgba(14, 165, 233, 0.12);
     padding: 2px 6px;
     border-radius: 6px;
     font-weight: 800;
+    cursor: pointer;
+    transition: all 0.15s ease;
     text-decoration: underline;
     text-decoration-color: rgba(14, 165, 233, 0.4);
     text-underline-offset: 3px;
+}
+
+.shadowing-highlight:hover {
+    background: rgba(14, 165, 233, 0.25);
+    text-decoration-color: rgba(14, 165, 233, 0.7);
+}
+
+.shadowing-detail-popup {
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border: 1px solid rgba(14, 165, 233, 0.2);
+    margin-bottom: 16px;
+    animation: fadeIn 0.2s ease;
 }
 
 .shadowing-card-actions {

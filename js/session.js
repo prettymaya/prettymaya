@@ -733,20 +733,21 @@ class FlowSessionManager {
 }
 
 class ShadowingSessionManager {
-    constructor(meaningSentencesMap) {
+    constructor(meaningSentencesMap, groupSize = 1) {
         this.meaningSentences = meaningSentencesMap;
-        this.mainQueue = [];
+        this.groupSize = groupSize;
+        this.allItems = [];
+        this.chunks = [];
         this.position = 0;
         this.currentCard = null;
 
-        // Build queue: one card per meaning, with a random sentence
+        // Build items: one per meaning, with a random sentence
         for (const [mId, sentences] of meaningSentencesMap) {
             if (sentences.length === 0) continue;
             const sentence = sentences[Math.floor(Math.random() * sentences.length)];
-            this.mainQueue.push({
+            this.allItems.push({
                 meaningId: mId,
                 word: sentence.word,
-                hint: sentence.hint || '',
                 englishDefinition: sentence.englishDefinition || '',
                 turkishDefinition: sentence.turkishDefinition || null,
                 sentence: sentence,
@@ -754,37 +755,43 @@ class ShadowingSessionManager {
             });
         }
 
-        // Shuffle
-        for (let i = this.mainQueue.length - 1; i > 0; i--) {
+        // Shuffle all items
+        for (let i = this.allItems.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [this.mainQueue[i], this.mainQueue[j]] = [this.mainQueue[j], this.mainQueue[i]];
+            [this.allItems[i], this.allItems[j]] = [this.allItems[j], this.allItems[i]];
         }
 
-        this.stats = { total: this.mainQueue.length, correct: 0, incorrect: 0 };
+        // Group into chunks of groupSize
+        for (let i = 0; i < this.allItems.length; i += groupSize) {
+            this.chunks.push(this.allItems.slice(i, i + groupSize));
+        }
+
+        this.stats = { total: this.chunks.length, correct: 0, incorrect: 0 };
     }
 
     getNextCard() {
-        if (this.position < this.mainQueue.length) {
-            this.currentCard = this.mainQueue[this.position];
+        if (this.position < this.chunks.length) {
+            this.currentCard = this.chunks[this.position];
             this.position++;
             this.stats.correct = this.position;
-            return this.currentCard;
+            return this.currentCard; // returns an array of items
         }
         this.currentCard = null;
         return null;
     }
 
-    shuffleSentence() {
-        if (!this.currentCard) return false;
-        const sentences = this.currentCard.allSentences;
+    shuffleSentenceAt(index) {
+        if (!this.currentCard || index >= this.currentCard.length) return false;
+        const item = this.currentCard[index];
+        const sentences = item.allSentences;
         if (sentences.length <= 1) return false;
         
         let next;
         do {
             next = sentences[Math.floor(Math.random() * sentences.length)];
-        } while (next.id === this.currentCard.sentence.id && sentences.length > 1);
+        } while (next.id === item.sentence.id && sentences.length > 1);
         
-        this.currentCard.sentence = next;
+        item.sentence = next;
         return true;
     }
 
@@ -797,3 +804,4 @@ class ShadowingSessionManager {
         };
     }
 }
+

@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" href="icon.png">
     <!-- Icons: FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="css/style.css?v=60">
+    <link rel="stylesheet" href="css/style.css?v=61">
 </head>
 <body>
 
@@ -367,6 +367,21 @@
                             </div>
                         </div>
 
+                        <!-- Shadowing Options (hidden by default) -->
+                        <div id="shadowing-options" style="display: none; margin-bottom: 20px;">
+                            <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                                <div style="text-align: center;">
+                                    <label style="font-size: 0.78rem; color: var(--text-secondary); display: block; margin-bottom: 6px;">Kart Başına Cümle Sayısı</label>
+                                    <div style="display: flex; gap: 6px;">
+                                        <button class="btn btn-secondary btn-sm shadowing-group-btn" data-group="1">1</button>
+                                        <button class="btn btn-secondary btn-sm shadowing-group-btn" data-group="5">5</button>
+                                        <button class="btn btn-primary btn-sm shadowing-group-btn" data-group="10">10</button>
+                                        <button class="btn btn-secondary btn-sm shadowing-group-btn" data-group="20">20</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Setup specific options -->
 
                         <button class="btn btn-primary btn-lg" id="btn-start-session" style="width: 100%;">
@@ -573,43 +588,37 @@
                                     <span>🔊 Otomatik Seslendir</span>
                                 </label>
                                 <div class="shadowing-timer-controls">
-                                    <span style="font-size:0.78rem;color:var(--text-secondary);margin-right:6px;">Otomatik:</span>
-                                    <button class="btn btn-ghost btn-sm shadowing-timer-btn active" data-timer="0">Manuel</button>
+                                    <span style="font-size:0.78rem;color:var(--text-secondary);margin-right:6px;">Tekrar:</span>
+                                    <button class="btn btn-ghost btn-sm shadowing-timer-btn active" data-timer="0">Kapalı</button>
+                                    <button class="btn btn-ghost btn-sm shadowing-timer-btn" data-timer="1">1s</button>
+                                    <button class="btn btn-ghost btn-sm shadowing-timer-btn" data-timer="2">2s</button>
                                     <button class="btn btn-ghost btn-sm shadowing-timer-btn" data-timer="3">3s</button>
-                                    <button class="btn btn-ghost btn-sm shadowing-timer-btn" data-timer="5">5s</button>
-                                    <button class="btn btn-ghost btn-sm shadowing-timer-btn" data-timer="8">8s</button>
                                 </div>
                             </div>
                             <div class="shadowing-card" id="shadowing-card">
-                                <div class="shadowing-sentence" id="shadowing-sentence"></div>
+                                <div class="shadowing-sentences" id="shadowing-sentences"></div>
                                 <div class="shadowing-card-actions">
                                     <button class="btn btn-ghost btn-sm" id="btn-shadowing-speak" title="Seslendir">🔊 Dinle</button>
-                                    <button class="btn btn-ghost btn-sm" id="btn-shadowing-shuffle" title="Başka Cümle"><i class="fa-solid fa-shuffle"></i> Başka Cümle</button>
+                                    <button class="btn btn-ghost btn-sm" id="btn-shadowing-shuffle" title="Cümleleri Değiştir"><i class="fa-solid fa-shuffle"></i> Cümleleri Değiştir</button>
                                 </div>
-                                <button class="shadowing-details-toggle" id="btn-shadowing-details">
-                                    <i class="fa-solid fa-chevron-down"></i> Detaylar
-                                </button>
-                                <div class="shadowing-details" id="shadowing-details" style="display:none;">
-                                    <div class="shadowing-detail-row">
-                                        <span class="shadowing-detail-label">Kelime:</span>
-                                        <span class="shadowing-detail-value" id="shadowing-det-word"></span>
-                                    </div>
-                                    <div class="shadowing-detail-row">
-                                        <span class="shadowing-detail-label">🇬🇧 Anlam:</span>
-                                        <span class="shadowing-detail-value" id="shadowing-det-en"></span>
-                                    </div>
-                                    <div class="shadowing-detail-row">
-                                        <span class="shadowing-detail-label">🇹🇷 Çeviri:</span>
-                                        <span class="shadowing-detail-value" id="shadowing-det-tr"></span>
-                                    </div>
-                                    <div class="shadowing-detail-row">
-                                        <span class="shadowing-detail-label">🇹🇷 Cümle:</span>
-                                        <span class="shadowing-detail-value" id="shadowing-det-sentence-tr"></span>
-                                    </div>
-                                    <div class="shadowing-detail-row">
-                                        <span class="shadowing-detail-label">İpucu:</span>
-                                        <span class="shadowing-detail-value" id="shadowing-det-hint"></span>
-                                    </div>
+                            </div>
+                            <!-- Inline detail popup -->
+                            <div class="shadowing-detail-popup" id="shadowing-detail-popup" style="display:none;">
+                                <div class="shadowing-detail-row">
+                                    <span class="shadowing-detail-label">Kelime:</span>
+                                    <span class="shadowing-detail-value" id="shadowing-pop-word"></span>
+                                </div>
+                                <div class="shadowing-detail-row">
+                                    <span class="shadowing-detail-label">🇬🇧 Anlam:</span>
+                                    <span class="shadowing-detail-value" id="shadowing-pop-en"></span>
+                                </div>
+                                <div class="shadowing-detail-row">
+                                    <span class="shadowing-detail-label">🇹🇷 Çeviri:</span>
+                                    <span class="shadowing-detail-value" id="shadowing-pop-tr"></span>
+                                </div>
+                                <div class="shadowing-detail-row">
+                                    <span class="shadowing-detail-label">🇹🇷 Cümle:</span>
+                                    <span class="shadowing-detail-value" id="shadowing-pop-sentence-tr"></span>
                                 </div>
                             </div>
                             <button class="btn btn-primary btn-lg" id="btn-shadowing-next" style="width: 100%; max-width: 400px; margin: 0 auto; display: block;">
@@ -954,11 +963,11 @@
     <div class="toast-container" id="toast-container"></div>
 
     <!-- Scripts -->
-    <script src="js/db.js?v=56"></script>
-    <script src="js/sync.js?v=56"></script>
-    <script src="js/dictionary.js?v=56"></script>
-    <script src="js/gemini.js?v=56"></script>
-    <script src="js/session.js?v=56"></script>
-    <script src="js/app.js?v=56"></script>
+    <script src="js/db.js?v=57"></script>
+    <script src="js/sync.js?v=57"></script>
+    <script src="js/dictionary.js?v=57"></script>
+    <script src="js/gemini.js?v=57"></script>
+    <script src="js/session.js?v=57"></script>
+    <script src="js/app.js?v=57"></script>
 </body>
 </html>
