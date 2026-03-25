@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         shadowingSentences: document.getElementById('shadowing-sentences'),
         shadowingPopupOverlay: document.getElementById('shadowing-popup-overlay'),
         shadowingPopupClose: document.getElementById('shadowing-popup-close'),
-        btnShadowingSpeak: document.getElementById('btn-shadowing-speak'),
+
         btnShadowingShuffle: document.getElementById('btn-shadowing-shuffle'),
         btnShadowingNext: document.getElementById('btn-shadowing-next'),
         shadowingOptions: document.getElementById('shadowing-options'),
@@ -225,167 +225,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     let practiceMode = 'recall'; // 'recall' | 'reading' | 'mixed' | 'scan' | 'flow'
     let currentCardMode = 'recall';
 
-    // ─── Text-to-Speech ──────────────────────────────────
-    function speakWord(word) {
-        if (!window.speechSynthesis) return;
-        speechSynthesis.cancel();
-        const utter = new SpeechSynthesisUtterance(word);
-        utter.lang = 'en-US';
-        utter.rate = 0.9;
-        speechSynthesis.speak(utter);
-    }
-    window.speakWord = speakWord; // expose for inline onclick
+    // ─── TTS removed — user uses macOS Siri directly ───
+    function speakWord() {}
+    window.speakWord = speakWord;
 
-    // ─── TTS Voice System (Piper TTS — Browser WASM) ─────────────
-    // Neural TTS running entirely in browser via WebAssembly (ONNX Runtime)
-    // Models cached in Origin Private File System after first download
-    // No server needed — works on GitHub Pages!
-    
-    const PIPER_VOICES = [
-        { id: 'en_US-hfc_female-medium', label: '⭐ HFC Female (Doğal)' },
-        { id: 'en_US-amy-medium', label: 'Amy' },
-    ];
-
-    let _selectedVoiceId = localStorage.getItem('shadowingVoice') || 'en_US-hfc_female-medium';
-    let _currentAudio = null;
-    let _piperTTS = null;
-    let _piperLoading = false;
-    let _loadedVoiceId = null; // Track which voice model is loaded
-    const _voiceSelect = document.getElementById('shadowing-voice-select');
-
-    // Populate voice dropdown
-    (function populateVoiceList() {
-        if (!_voiceSelect) return;
-        _voiceSelect.innerHTML = '';
-        var grp = document.createElement('optgroup');
-        grp.label = '🎤 Neural Sesler (US Kadın)';
-        PIPER_VOICES.forEach(function(v) {
-            var opt = document.createElement('option');
-            opt.value = v.id;
-            opt.textContent = v.label;
-            if (v.id === _selectedVoiceId) opt.selected = true;
-            grp.appendChild(opt);
-        });
-        _voiceSelect.appendChild(grp);
-    })();
-
-    if (_voiceSelect) {
-        _voiceSelect.addEventListener('change', function() {
-            _selectedVoiceId = _voiceSelect.value;
-            localStorage.setItem('shadowingVoice', _selectedVoiceId);
-            speakSentence('Hello, this is my voice.');
-        });
-    }
-
-    // Speed control
-    let _ttsSpeed = parseFloat(localStorage.getItem('shadowingSpeed') || '1.2');
-    var _speedSlider = document.getElementById('shadowing-speed');
-    var _speedLabel = document.getElementById('shadowing-speed-label');
-    if (_speedSlider) {
-        _speedSlider.value = _ttsSpeed;
-        if (_speedLabel) _speedLabel.textContent = _ttsSpeed.toFixed(1) + 'x';
-        _speedSlider.addEventListener('input', function() {
-            _ttsSpeed = parseFloat(_speedSlider.value);
-            localStorage.setItem('shadowingSpeed', _ttsSpeed);
-            if (_speedLabel) _speedLabel.textContent = _ttsSpeed.toFixed(1) + 'x';
-        });
-    }
-
-    // Load Piper TTS module dynamically from CDN
-    async function loadPiperTTS() {
-        if (_piperTTS) return _piperTTS;
-        if (_piperLoading) {
-            while (_piperLoading && !_piperTTS) {
-                await new Promise(function(r) { setTimeout(r, 100); });
-            }
-            return _piperTTS;
-        }
-        _piperLoading = true;
-        var cdns = [
-            'https://cdn.jsdelivr.net/npm/@mintplex-labs/piper-tts-web/+esm',
-            'https://cdn.jsdelivr.net/npm/@mintplex-labs/piper-tts-web@1.0.4/+esm',
-        ];
-        for (var i = 0; i < cdns.length; i++) {
-            try {
-                console.log('[Piper] Yükleniyor: ' + cdns[i]);
-                _piperTTS = await import(cdns[i]);
-                console.log('[Piper] ✅ Modül yüklendi, API:', Object.keys(_piperTTS));
-                return _piperTTS;
-            } catch(e) { console.warn('[Piper] CDN ' + i + ' başarısız:', e.message || e); }
-        }
-        console.error('[Piper] ❌ Tüm CDN kaynakları başarısız');
-        _piperLoading = false;
-        return null;
-    }
-
-    function _cancelTTS() {
-        if (_currentAudio) {
-            _currentAudio.pause();
-            _currentAudio.src = '';
-            _currentAudio = null;
-        }
-        if (window.speechSynthesis) speechSynthesis.cancel();
-    }
-
-    function speakSentence(text, rate, onEnd) {
-        if (!text) { if (onEnd) onEnd(); return; }
-        rate = _ttsSpeed || 1.2;
-        _cancelTTS();
-        _piperSpeak(text, rate, onEnd);
-    }
-
-    async function _piperSpeak(text, rate, onEnd) {
-        try {
-            var tts = await loadPiperTTS();
-            if (!tts) { _webSpeechFallback(text, rate, onEnd); return; }
-
-            var selectedOpt = _voiceSelect ? _voiceSelect.selectedOptions[0] : null;
-            var originalLabel = selectedOpt ? selectedOpt.textContent : '';
-
-            // If voice changed, flush the old cached model so it loads the new one
-            if (_loadedVoiceId && _loadedVoiceId !== _selectedVoiceId) {
-                console.log('[Piper] Ses değişti: ' + _loadedVoiceId + ' → ' + _selectedVoiceId);
-                try { await tts.flush(); } catch(e) { /* ignore */ }
-            }
-
-            console.log('[Piper] Ses üretiliyor: ' + _selectedVoiceId);
-            var wav = await tts.predict(
-                { text: text, voiceId: _selectedVoiceId },
-                function(progress) {
-                    if (progress && progress.total && selectedOpt) {
-                        var pct = Math.round((progress.loaded || 0) * 100 / progress.total);
-                        selectedOpt.textContent = '⬇️ İndiriliyor... ' + pct + '%';
-                    }
-                }
-            );
-
-            _loadedVoiceId = _selectedVoiceId;
-            if (selectedOpt) selectedOpt.textContent = originalLabel;
-
-            var url = URL.createObjectURL(wav);
-            var audio = new Audio(url);
-            audio.playbackRate = rate;
-            console.log('[Piper] Hız:', rate + 'x');
-            _currentAudio = audio;
-            audio.onended = function() { URL.revokeObjectURL(url); _currentAudio = null; if (onEnd) onEnd(); };
-            audio.onerror = function() { URL.revokeObjectURL(url); _currentAudio = null; if (onEnd) onEnd(); };
-            await audio.play();
-        } catch(e) {
-            console.error('[Piper] Hata:', e);
-            _webSpeechFallback(text, rate, onEnd);
-        }
-    }
-
-    function _webSpeechFallback(text, rate, onEnd) {
-        if (!window.speechSynthesis) { if (onEnd) onEnd(); return; }
-        speechSynthesis.cancel();
-        var utter = new SpeechSynthesisUtterance(text);
-        utter.lang = 'en-US';
-        utter.rate = rate;
-        if (onEnd) utter.onend = onEnd;
-        speechSynthesis.speak(utter);
-    }
-
+    function speakSentence(text, rate, onEnd) { if (onEnd) onEnd(); }
     window.speakSentence = speakSentence;
 
 
@@ -3598,28 +3442,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             };
 
-            // Auto-speak with repeat-after-speech
-            function doShadowingSpeak() {
-                var text = getShadowingFullText();
-                if (!text) return;
-                speakSentence(text, 0.85, function() {
-                    if (shadowingTimerInterval > 0) {
-                        shadowingTimerHandle = setTimeout(function() {
-                            doShadowingSpeak();
-                        }, shadowingTimerInterval * 1000);
-                    }
-                });
-            }
 
-            if (shadowingAutoSpeak) {
-                setTimeout(function() { doShadowingSpeak(); }, 300);
-            }
-
-            // Speak button
-            els.btnShadowingSpeak.onclick = function() {
-                if (shadowingTimerHandle) { clearTimeout(shadowingTimerHandle); shadowingTimerHandle = null; }
-                doShadowingSpeak();
-            };
 
             // Shuffle all sentences
             els.btnShadowingShuffle.onclick = function() {
@@ -3631,10 +3454,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
                 if (anyShuffled) {
                     renderShadowingGrouped();
-                    if (shadowingAutoSpeak) {
-                        if (shadowingTimerHandle) { clearTimeout(shadowingTimerHandle); shadowingTimerHandle = null; }
-                        doShadowingSpeak();
-                    }
                 } else {
                     showToast('Ba\u015fka c\u00fcmle bulunamad\u0131.', 'info');
                 }
@@ -3643,7 +3462,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Next button
             els.btnShadowingNext.onclick = function() {
                 if (shadowingTimerHandle) { clearTimeout(shadowingTimerHandle); shadowingTimerHandle = null; }
-                if (window.speechSynthesis) speechSynthesis.cancel();
                 loadNextCard();
             };
 
