@@ -248,6 +248,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         { id: 'en_US-kristin-medium', label: 'Kristin' },
         { id: 'en_US-ljspeech-medium', label: 'LJSpeech (Medium)' },
         { id: 'en_US-ljspeech-high', label: 'LJSpeech (High)' },
+        { id: 'en_US-lessac-medium', label: 'Lessac (Medium)' },
+        { id: 'en_US-lessac-high', label: 'Lessac (High)' },
         { id: 'en_US-kathleen-low', label: 'Kathleen' },
     ];
 
@@ -255,6 +257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let _currentAudio = null;
     let _piperTTS = null;
     let _piperLoading = false;
+    let _loadedVoiceId = null; // Track which voice model is loaded
     const _voiceSelect = document.getElementById('shadowing-voice-select');
 
     // Populate voice dropdown
@@ -332,6 +335,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             var selectedOpt = _voiceSelect ? _voiceSelect.selectedOptions[0] : null;
             var originalLabel = selectedOpt ? selectedOpt.textContent : '';
 
+            // If voice changed, flush the old cached model so it loads the new one
+            if (_loadedVoiceId && _loadedVoiceId !== _selectedVoiceId) {
+                console.log('[Piper] Ses değişti: ' + _loadedVoiceId + ' → ' + _selectedVoiceId);
+                try { await tts.flush(); } catch(e) { /* ignore */ }
+            }
+
+            console.log('[Piper] Ses üretiliyor: ' + _selectedVoiceId);
             var wav = await tts.predict(
                 { text: text, voiceId: _selectedVoiceId },
                 function(progress) {
@@ -342,6 +352,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             );
 
+            _loadedVoiceId = _selectedVoiceId;
             if (selectedOpt) selectedOpt.textContent = originalLabel;
 
             var url = URL.createObjectURL(wav);
