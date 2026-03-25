@@ -236,9 +236,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // Shadowing mode state
-    let shadowingAutoSpeak = true;
-    let shadowingTimerInterval = 0; // 0 = off, 1/2/3 = repeat after N seconds
-    let shadowingTimerHandle = null;
     let shadowingGroupSize = 10;
 
     // Flow mode state
@@ -2698,17 +2695,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
-    // Shadowing control event listeners
-    document.getElementById('shadowing-auto-speak')?.addEventListener('change', (e) => {
-        shadowingAutoSpeak = e.target.checked;
-    });
-    document.querySelectorAll('.shadowing-timer-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            shadowingTimerInterval = parseInt(btn.dataset.timer);
-            document.querySelectorAll('.shadowing-timer-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-        });
-    });
+
 
     if (els.btnModeCombined) {
         els.btnModeCombined.addEventListener('click', () => {
@@ -3372,9 +3359,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Container width
             els.practiceActive.style.maxWidth = '900px';
 
-            // Clear timer & TTS
-            if (shadowingTimerHandle) { clearTimeout(shadowingTimerHandle); shadowingTimerHandle = null; }
-            if (window.speechSynthesis) speechSynthesis.cancel();
+
 
             // card is an array of items (grouped)
             const items = card;
@@ -3461,7 +3446,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Next button
             els.btnShadowingNext.onclick = function() {
-                if (shadowingTimerHandle) { clearTimeout(shadowingTimerHandle); shadowingTimerHandle = null; }
+
                 loadNextCard();
             };
 
@@ -4141,9 +4126,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function finishSessionUI() {
         clearSavedSession();
-        // Clear shadowing timer & TTS
-        if (shadowingTimerHandle) { clearTimeout(shadowingTimerHandle); shadowingTimerHandle = null; }
-        if (window.speechSynthesis) speechSynthesis.cancel();
+
         els.practiceActive.style.display = 'none';
         els.practiceComplete.style.display = 'block';
 
