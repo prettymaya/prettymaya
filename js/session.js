@@ -385,10 +385,10 @@ class SpeakingSessionManager {
             [this.mainQueue[i], this.mainQueue[j]] = [this.mainQueue[j], this.mainQueue[i]];
         }
         
-        // Chunk by 3
+        // Chunk by 4
         this.chunks = [];
-        for (let i = 0; i < this.mainQueue.length; i += 3) {
-            this.chunks.push(this.mainQueue.slice(i, i + 3));
+        for (let i = 0; i < this.mainQueue.length; i += 4) {
+            this.chunks.push(this.mainQueue.slice(i, i + 4));
         }
 
         // Fix constraint: no duplicate meaningId in the same chunk

@@ -1165,6 +1165,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             panel.style.display = 'block';
             icon.className = 'fa-solid fa-chevron-up';
             renderListGenCategories();
+            renderMlGenCategories();
         } else {
             panel.style.display = 'none';
             icon.className = 'fa-solid fa-chevron-down';
@@ -1275,6 +1276,81 @@ document.addEventListener('DOMContentLoaded', async () => {
         const text = document.getElementById('list-gen-output').value;
         if (!text) { showToast('Önce liste oluşturun.', 'error'); return; }
         navigator.clipboard.writeText(text).then(() => showToast('Liste panoya kopyalandı!', 'success'));
+    });
+
+    // ─── Meaning List Generator ──────────────────────────────
+    document.getElementById('meaning-list-toggle')?.addEventListener('click', () => {
+        const panel = document.getElementById('meaning-list-panel');
+        if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    });
+
+    async function renderMlGenCategories() {
+        const container = document.getElementById('ml-gen-categories');
+        if (!container) return;
+        const categories = await DB.getAllCategories();
+        container.innerHTML = `<label style="color:var(--text-primary);font-size:0.85rem;"><input type="checkbox" class="ml-cat-check" value="all" checked> Tümü</label>`;
+        for (const cat of categories) {
+            container.innerHTML += `<label style="color:var(--text-primary);font-size:0.85rem;"><input type="checkbox" class="ml-cat-check" value="${cat.id}"> ${cat.name}</label>`;
+        }
+    }
+
+    document.getElementById('btn-generate-meaning-list')?.addEventListener('click', async () => {
+        const checkedCats = [...document.querySelectorAll('.ml-cat-check:checked')].map(c => c.value);
+        const count = parseInt(document.getElementById('ml-gen-count').value) || 200;
+
+        // Get eligible words
+        let eligibleWords;
+        if (checkedCats.includes('all') || checkedCats.length === 0) {
+            eligibleWords = allWords.map(w => w.word);
+        } else {
+            const wordSets = await Promise.all(checkedCats.map(id => DB.getWordsInCategory(Number(id))));
+            const merged = new Set();
+            wordSets.forEach(ws => ws.forEach(w => merged.add(w)));
+            eligibleWords = [...merged];
+        }
+
+        // Collect all meanings with definitions
+        const meaningsGrouped = await DB.getAllMeaningsGrouped();
+        const allMeanings = [];
+
+        for (const word of eligibleWords) {
+            const meanings = meaningsGrouped[word] || [];
+            for (const m of meanings) {
+                if (m.definition) {
+                    allMeanings.push({ word, definition: m.definition, meaningId: m.id });
+                }
+            }
+        }
+
+        // Shuffle
+        for (let i = allMeanings.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allMeanings[i], allMeanings[j]] = [allMeanings[j], allMeanings[i]];
+        }
+
+        // Ensure unique meanings (no duplicate meaningId)
+        const seen = new Set();
+        const unique = [];
+        for (const m of allMeanings) {
+            if (!seen.has(m.meaningId)) {
+                seen.add(m.meaningId);
+                unique.push(m);
+            }
+        }
+
+        // Limit to requested count
+        const limited = unique.slice(0, count);
+
+        // Output: word - definition
+        const output = limited.map(r => `${r.word} - ${r.definition}`).join('\n');
+        document.getElementById('ml-gen-output').value = output;
+        showToast(`${limited.length} anlam oluşturuldu (toplam ${unique.length} benzersiz anlam mevcut).`, 'success');
+    });
+
+    document.getElementById('btn-copy-meaning-list')?.addEventListener('click', () => {
+        const text = document.getElementById('ml-gen-output').value;
+        if (!text) { showToast('Önce liste oluşturun.', 'error'); return; }
+        navigator.clipboard.writeText(text).then(() => showToast('Anlam listesi panoya kopyalandı!', 'success'));
     });
 
     // ─── TR Definition Analysis & Bulk Translate ──────────────
@@ -3001,7 +3077,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (els.phaseScan) els.phaseScan.style.display = 'none';
             
             // Expand container for speaking mode
-            els.practiceActive.style.maxWidth = '1200px';
+            els.practiceActive.style.maxWidth = '1400px';
             
             if (els.speakingWordsContainer) {
                 els.speakingWordsContainer.innerHTML = '';
