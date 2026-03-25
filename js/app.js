@@ -3042,7 +3042,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const prog = currentSession.getProgress();
         let displayCurrent = 1;
         
-        if (practiceMode === 'reading' || practiceMode === 'warmup' || practiceMode === 'speaking' || practiceMode === 'combined' || practiceMode === 'scan' || practiceMode === 'flow') {
+        if (practiceMode === 'reading' || practiceMode === 'warmup' || practiceMode === 'speaking' || practiceMode === 'combined' || practiceMode === 'scan' || practiceMode === 'flow' || practiceMode === 'shadowing') {
             displayCurrent = prog.stats.correct || 1;
         } else {
             const retries = currentSession.retryInserts ? currentSession.retryInserts.length : 0;

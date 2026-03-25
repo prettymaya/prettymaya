@@ -767,6 +767,11 @@ class ShadowingSessionManager {
         }
 
         this.stats = { total: this.chunks.length, correct: 0, incorrect: 0 };
+
+        // Compatibility: expose remaining chunks as mainQueue for session save/resume
+        Object.defineProperty(this, 'mainQueue', {
+            get: () => this.chunks.slice(this.position)
+        });
     }
 
     getNextCard() {
