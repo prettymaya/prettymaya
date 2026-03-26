@@ -348,13 +348,14 @@ class WarmUpSessionManager {
 }
 
 class SpeakingSessionManager {
-    constructor(meaningList, meaningSentencesMap, repeatCount = 2) {
+    constructor(meaningList, meaningSentencesMap, repeatCount = 2, wordsPerGroup = 4) {
         this.meaningList = [...meaningList];
         this.meaningSentences = meaningSentencesMap;
         this.mainQueue = [];
         this.position = 0;
         this.stats = { total: 0, correct: 0, incorrect: 0 };
         this.currentCards = null;
+        this.wordsPerGroup = wordsPerGroup;
 
         // Build queue — each meaning appears `repeatCount` times
         for (const mId of this.meaningList) {
@@ -385,10 +386,10 @@ class SpeakingSessionManager {
             [this.mainQueue[i], this.mainQueue[j]] = [this.mainQueue[j], this.mainQueue[i]];
         }
         
-        // Chunk by 4
+        // Chunk by wordsPerGroup
         this.chunks = [];
-        for (let i = 0; i < this.mainQueue.length; i += 4) {
-            this.chunks.push(this.mainQueue.slice(i, i + 4));
+        for (let i = 0; i < this.mainQueue.length; i += this.wordsPerGroup) {
+            this.chunks.push(this.mainQueue.slice(i, i + this.wordsPerGroup));
         }
 
         // Fix constraint: no duplicate meaningId in the same chunk

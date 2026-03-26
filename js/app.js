@@ -236,7 +236,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // Shadowing mode state
-    let shadowingGroupSize = 10;
+    let shadowingGroupSize = parseInt(localStorage.getItem('shadowingGroupSize') || '3');
 
     // Flow mode state
     let flowTimer = null;
@@ -245,6 +245,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let flowPaused = false;
 
     let speakingRepeatCount = 2;
+    let speakingWordsPerGroup = parseInt(localStorage.getItem('speakingWordsPerGroup') || '3');
     let searchTimeout = null;
     let selectedCategoryId = 'all'; // For word list filtering
     let practiceSource = 'all'; // 'all' or 'category'
@@ -2459,7 +2460,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (practiceMode === 'warmup') {
             currentSession = new WarmUpSessionManager(readyMeaningsMap, 1);
         } else if (practiceMode === 'speaking') {
-            currentSession = new SpeakingSessionManager([...readyMeaningsMap.keys()], readyMeaningsMap, speakingRepeatCount);
+            currentSession = new SpeakingSessionManager([...readyMeaningsMap.keys()], readyMeaningsMap, speakingRepeatCount, speakingWordsPerGroup);
         } else if (practiceMode === 'combined') {
             currentSession = new CombinedCardSessionManager(readyMeaningsMap, combinedGroupSize, combinedSPM);
         } else if (practiceMode === 'scan') {
@@ -2572,7 +2573,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (practiceMode === 'warmup') {
             currentSession = new WarmUpSessionManager(readyMeaningsMap, 1);
         } else if (practiceMode === 'speaking') {
-            currentSession = new SpeakingSessionManager([...readyMeaningsMap.keys()], readyMeaningsMap, speakingRepeatCount);
+            currentSession = new SpeakingSessionManager([...readyMeaningsMap.keys()], readyMeaningsMap, speakingRepeatCount, speakingWordsPerGroup);
         } else if (practiceMode === 'combined') {
             currentSession = new CombinedCardSessionManager(readyMeaningsMap, combinedGroupSize, combinedSPM);
         } else if (practiceMode === 'scan') {
@@ -2646,8 +2647,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.speaking-repeat-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             speakingRepeatCount = parseInt(btn.dataset.repeat);
+            localStorage.setItem('speakingRepeatCount', speakingRepeatCount);
             document.querySelectorAll('.speaking-repeat-btn').forEach(b => b.className = 'btn btn-secondary btn-sm speaking-repeat-btn');
             btn.className = 'btn btn-primary btn-sm speaking-repeat-btn';
+        });
+    });
+
+    // Speaking words-per-group buttons
+    document.querySelectorAll('.speaking-wpg-btn').forEach(btn => {
+        if (parseInt(btn.dataset.wpg) === speakingWordsPerGroup) {
+            btn.className = 'btn btn-primary btn-sm speaking-wpg-btn';
+        } else {
+            btn.className = 'btn btn-secondary btn-sm speaking-wpg-btn';
+        }
+        btn.addEventListener('click', () => {
+            speakingWordsPerGroup = parseInt(btn.dataset.wpg);
+            localStorage.setItem('speakingWordsPerGroup', speakingWordsPerGroup);
+            document.querySelectorAll('.speaking-wpg-btn').forEach(b => b.className = 'btn btn-secondary btn-sm speaking-wpg-btn');
+            btn.className = 'btn btn-primary btn-sm speaking-wpg-btn';
         });
     });
     
@@ -2686,10 +2703,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Shadowing group size buttons
+    // Shadowing group size buttons — init saved state
     document.querySelectorAll('.shadowing-group-btn').forEach(btn => {
+        if (parseInt(btn.dataset.group) === shadowingGroupSize) {
+            btn.className = 'btn btn-primary btn-sm shadowing-group-btn';
+        } else {
+            btn.className = 'btn btn-secondary btn-sm shadowing-group-btn';
+        }
         btn.addEventListener('click', () => {
             shadowingGroupSize = parseInt(btn.dataset.group);
+            localStorage.setItem('shadowingGroupSize', shadowingGroupSize);
             document.querySelectorAll('.shadowing-group-btn').forEach(b => b.className = 'btn btn-secondary btn-sm shadowing-group-btn');
             btn.className = 'btn btn-primary btn-sm shadowing-group-btn';
         });
@@ -2958,7 +2981,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (practiceMode === 'warmup') {
             currentSession = new WarmUpSessionManager(filteredMap, 1);
         } else if (practiceMode === 'speaking') {
-            currentSession = new SpeakingSessionManager([...filteredMap.keys()], filteredMap, speakingRepeatCount);
+            currentSession = new SpeakingSessionManager([...filteredMap.keys()], filteredMap, speakingRepeatCount, speakingWordsPerGroup);
         } else if (practiceMode === 'combined') {
             currentSession = new CombinedCardSessionManager(filteredMap, combinedGroupSize, combinedSPM);
         } else if (practiceMode === 'scan') {
@@ -3356,10 +3379,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (els.phaseScan) els.phaseScan.style.display = 'none';
             if (els.phaseShadowing) els.phaseShadowing.style.display = 'none';
 
-            // Container width
-            els.practiceActive.style.maxWidth = '900px';
+            // Container width — adapt based on sentence count
+            if (shadowingGroupSize <= 2) {
+                els.practiceActive.style.maxWidth = '700px';
+            } else if (shadowingGroupSize <= 5) {
+                els.practiceActive.style.maxWidth = '800px';
+            } else {
+                els.practiceActive.style.maxWidth = '900px';
+            }
 
-
+            // Font size — bigger text for fewer sentences
+            var shadowingFontSize = shadowingGroupSize <= 2 ? '1.25rem' : shadowingGroupSize <= 5 ? '1.1rem' : '1rem';
+            els.shadowingSentences.style.fontSize = shadowingFontSize;
+            els.shadowingSentences.style.lineHeight = '1.8';
 
             // card is an array of items (grouped)
             const items = card;

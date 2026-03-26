@@ -352,11 +352,19 @@
                             </div>
                         </div>
 
-                        <!-- Speaking Options (hidden by default) -->
                         <div id="speaking-options" style="display: none; margin-bottom: 20px;">
                             <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
                                 <div style="text-align: center;">
-                                    <label style="font-size: 0.78rem; color: var(--text-secondary); display: block; margin-bottom: 6px;">Her Anlam Kaç Kez Gösterilsin?</label>
+                                    <label style="font-size: 0.78rem; color: var(--text-secondary); display: block; margin-bottom: 6px;">Kart Başına Kelime</label>
+                                    <div style="display: flex; gap: 6px;">
+                                        <button class="btn btn-secondary btn-sm speaking-wpg-btn" data-wpg="1">1</button>
+                                        <button class="btn btn-secondary btn-sm speaking-wpg-btn" data-wpg="2">2</button>
+                                        <button class="btn btn-primary btn-sm speaking-wpg-btn" data-wpg="3">3</button>
+                                        <button class="btn btn-secondary btn-sm speaking-wpg-btn" data-wpg="4">4</button>
+                                    </div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <label style="font-size: 0.78rem; color: var(--text-secondary); display: block; margin-bottom: 6px;">Her Anlam Kaç Kez?</label>
                                     <div style="display: flex; gap: 6px;">
                                         <button class="btn btn-secondary btn-sm speaking-repeat-btn" data-repeat="1">1</button>
                                         <button class="btn btn-primary btn-sm speaking-repeat-btn" data-repeat="2">2</button>
@@ -374,9 +382,10 @@
                                     <label style="font-size: 0.78rem; color: var(--text-secondary); display: block; margin-bottom: 6px;">Kart Başına Cümle Sayısı</label>
                                     <div style="display: flex; gap: 6px;">
                                         <button class="btn btn-secondary btn-sm shadowing-group-btn" data-group="1">1</button>
+                                        <button class="btn btn-secondary btn-sm shadowing-group-btn" data-group="2">2</button>
+                                        <button class="btn btn-primary btn-sm shadowing-group-btn" data-group="3">3</button>
                                         <button class="btn btn-secondary btn-sm shadowing-group-btn" data-group="5">5</button>
-                                        <button class="btn btn-primary btn-sm shadowing-group-btn" data-group="10">10</button>
-                                        <button class="btn btn-secondary btn-sm shadowing-group-btn" data-group="20">20</button>
+                                        <button class="btn btn-secondary btn-sm shadowing-group-btn" data-group="10">10</button>
                                     </div>
                                 </div>
                             </div>
@@ -576,7 +585,7 @@
                             </div>
                             
                             <button class="btn btn-primary btn-lg" id="btn-speaking-next" style="width: 100%; max-width: 300px; margin: 0 auto; display: block;">
-                                Sıradaki 4 Kelime <i class="fa-solid fa-forward"></i>
+                                Sıradaki Kelimeler <i class="fa-solid fa-forward"></i>
                             </button>
                         </div>
 
@@ -957,6 +966,6 @@
     <script src="js/dictionary.js?v=58"></script>
     <script src="js/gemini.js?v=58"></script>
     <script src="js/session.js?v=58"></script>
-    <script src="js/app.js?v=76"></script>
+    <script src="js/app.js?v=78"></script>
 </body>
 </html>
