@@ -1467,6 +1467,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             label.innerHTML = `<input type="checkbox" class="practice-cat-check" value="${cat.id}"> ${cat.name} <span style="color:var(--text-muted);font-size:0.8rem;">(${counts[cat.id] || 0})</span>`;
             container.appendChild(label);
         }
+
+        // Live counter on checkbox change
+        container.addEventListener('change', updatePracticeCatCount);
+    }
+
+    async function updatePracticeCatCount() {
+        const countEl = document.getElementById('practice-cat-count');
+        if (!countEl) return;
+        const checkedBoxes = document.querySelectorAll('.practice-cat-check:checked');
+        if (checkedBoxes.length === 0) {
+            countEl.style.display = 'none';
+            return;
+        }
+        const selectedCatIds = [...checkedBoxes].map(c => Number(c.value));
+        const wordSets = await Promise.all(selectedCatIds.map(id => DB.getWordsInCategory(id)));
+        const mergedWords = new Set();
+        wordSets.forEach(ws => ws.forEach(w => mergedWords.add(w)));
+        
+        // Count total meanings
+        const allMeaningsMap = await DB.getAllMeaningsGrouped();
+        let totalMeanings = 0;
+        mergedWords.forEach(word => {
+            totalMeanings += (allMeaningsMap[word] || []).length;
+        });
+
+        countEl.style.display = 'block';
+        countEl.innerHTML = `📊 <b>${mergedWords.size}</b> benzersiz kelime · <b>${totalMeanings}</b> toplam anlam`;
     }
 
     document.getElementById('btn-source-all')?.addEventListener('click', () => {
